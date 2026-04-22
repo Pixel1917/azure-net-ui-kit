@@ -147,6 +147,7 @@ const applyMaskValue = (input: HTMLInputElement, config: ResolvedMaskConfig): bo
 };
 
 const maskEventType = 'input';
+const maskEventOptions: AddEventListenerOptions = { capture: true };
 
 type MaskedActionResult = {
 	update: (next?: MaskValue | MaskedOptions, tokens?: Tokens) => void;
@@ -161,7 +162,7 @@ export const masked = (node: HTMLInputElement, maskOrOptions?: MaskValue | Maske
 		applyMaskValue(input, config);
 	};
 
-	input.addEventListener(maskEventType, handleInput);
+	input.addEventListener(maskEventType, handleInput, maskEventOptions);
 
 	const changedOnInit = applyMaskValue(input, config);
 	if (changedOnInit && config.emitInitialInput) {
@@ -177,7 +178,7 @@ export const masked = (node: HTMLInputElement, maskOrOptions?: MaskValue | Maske
 			}
 		},
 		destroy() {
-			input.removeEventListener(maskEventType, handleInput);
+			input.removeEventListener(maskEventType, handleInput, maskEventOptions);
 		}
 	};
 };
