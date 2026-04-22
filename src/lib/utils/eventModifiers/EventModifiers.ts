@@ -11,37 +11,70 @@ interface EventModifier<E extends Event = Event> {
 	stopImmediatePropagation: EventModifier<E>;
 }
 
-const createEventModifier = <E extends Event = Event>(modifiers = new Set<string>()): EventModifier<E> => {
-	return new Proxy(() => {}, {
-		get(_, prop: string) {
-			return createEventModifier<E>(new Set([...modifiers, prop]));
-		},
-		apply(_, __, [fn]: [() => void]): EventHandler<E> {
-			let executed = false;
+const FLAG_PREVENT = 1 << 0;
+const FLAG_STOP = 1 << 1;
+const FLAG_IMMEDIATE = 1 << 2;
+const FLAG_ONCE = 1 << 3;
 
-			return (event: E) => {
-				if (modifiers.has('once') && executed) return;
-
-				if (modifiers.has('prevent') || modifiers.has('preventDefault')) {
-					event.preventDefault();
-				}
-				if (modifiers.has('stop') || modifiers.has('stopPropagation')) {
-					event.stopPropagation();
-				}
-				if (modifiers.has('immediate') || modifiers.has('stopImmediatePropagation')) {
-					event.stopImmediatePropagation();
-				}
-
-				if (modifiers.has('once')) executed = true;
-
-				fn();
-			};
-		}
-	}) as unknown as EventModifier<E>;
+const flagByProp: Record<string, number | undefined> = {
+	prevent: FLAG_PREVENT,
+	preventDefault: FLAG_PREVENT,
+	stop: FLAG_STOP,
+	stopPropagation: FLAG_STOP,
+	immediate: FLAG_IMMEDIATE,
+	stopImmediatePropagation: FLAG_IMMEDIATE,
+	once: FLAG_ONCE
 };
 
-export const prevent = createEventModifier(new Set(['prevent']));
-export const stop = createEventModifier(new Set(['stop']));
-export const immediate = createEventModifier(new Set(['immediate']));
-export const once = createEventModifier(new Set(['once']));
+const createEventModifier = <E extends Event = Event>(initialMask = 0): EventModifier<E> => {
+	const cache = new Map<number, EventModifier<E>>();
+	const baseCallable = () => {};
+
+	const getOrCreate = (mask: number): EventModifier<E> => {
+		const cached = cache.get(mask);
+		if (cached) return cached;
+
+		const proxy = new Proxy(baseCallable, {
+			get(_, prop: string | symbol) {
+				if (typeof prop !== 'string') return undefined;
+
+				const flag = flagByProp[prop];
+				if (flag === undefined) return undefined;
+
+				return getOrCreate(mask | flag);
+			},
+			apply(_, __, [fn]: [() => void]): EventHandler<E> {
+				let executed = false;
+
+				return (event: E) => {
+					if ((mask & FLAG_ONCE) !== 0 && executed) return;
+
+					if ((mask & FLAG_PREVENT) !== 0) {
+						event.preventDefault();
+					}
+					if ((mask & FLAG_STOP) !== 0) {
+						event.stopPropagation();
+					}
+					if ((mask & FLAG_IMMEDIATE) !== 0) {
+						event.stopImmediatePropagation();
+					}
+
+					if ((mask & FLAG_ONCE) !== 0) executed = true;
+
+					fn();
+				};
+			}
+		}) as unknown as EventModifier<E>;
+
+		cache.set(mask, proxy);
+		return proxy;
+	};
+
+	return getOrCreate(initialMask);
+};
+
+export const prevent = createEventModifier(FLAG_PREVENT);
+export const stop = createEventModifier(FLAG_STOP);
+export const immediate = createEventModifier(FLAG_IMMEDIATE);
+export const once = createEventModifier(FLAG_ONCE);
 export const event = createEventModifier();
