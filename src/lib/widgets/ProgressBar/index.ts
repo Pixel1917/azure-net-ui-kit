@@ -1,4 +1,5 @@
 import { BROWSER } from '@azure-net/tools/environment';
+import { afterNavigate, beforeNavigate } from '$app/navigation';
 
 export interface ProgressBarOptions {
 	minimum?: number;
@@ -225,3 +226,17 @@ const createProgressBar = (): ProgressBarManager => {
 };
 
 export const progressBar = createProgressBar();
+
+export const useRouteLoadBar = (options: ProgressBarOptions = {}) => {
+	if (!BROWSER) {
+		throw Error('useRouteLoadBar must be used on client side in component');
+	}
+	progressBar.configure(options);
+	beforeNavigate(() => {
+		progressBar.start();
+	});
+
+	afterNavigate(() => {
+		progressBar.done();
+	});
+};

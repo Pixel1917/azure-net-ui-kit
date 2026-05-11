@@ -18,4 +18,4 @@ export {
 	type PropsWithCloseModal
 } from './Modal/index.js';
 
-export { progressBar, type ProgressBarManager, type ProgressBarOptions } from './ProgressBar/index.js';
+export { progressBar, useRouteLoadBar, type ProgressBarManager, type ProgressBarOptions } from './ProgressBar/index.js';
