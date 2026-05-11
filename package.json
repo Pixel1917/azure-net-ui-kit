@@ -11,6 +11,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
+		"test:unit": "vitest run",
+		"test": "pnpm test:unit",
 		"commit": "pnpm format && git add . && git-cz && git push"
 	},
 	"files": [
@@ -28,6 +30,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"svelte": "./dist/index.js"
+		},
+		"./widgets": {
+			"types": "./dist/widgets.d.ts",
+			"svelte": "./dist/widgets.js"
 		}
 	},
 	"peerDependencies": {
@@ -49,6 +55,7 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
 		"globals": "^17.4.0",
+		"happy-dom": "^20.0.8",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
 		"publint": "^0.3.18",
@@ -56,7 +63,8 @@
 		"svelte-check": "^4.4.6",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.58.1",
-		"vite": "^8.0.7"
+		"vite": "^8.0.7",
+		"vitest": "^4.1.4"
 	},
 	"config": {
 		"commitizen": {
