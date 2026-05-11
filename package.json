@@ -1,6 +1,6 @@
 {
 	"name": "@azure-net/ui-kit",
-	"version": "0.0.6",
+	"version": "0.1.6",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -14,6 +14,22 @@
 		"test:unit": "vitest run",
 		"test": "pnpm test:unit",
 		"commit": "pnpm format && git add . && git-cz && git push"
+	},
+	"author": "Pixel1917",
+	"description": "Azure-net ui library",
+	"homepage": "https://github.com/Pixel1917/azure-net-ui-kit",
+	"bugs": {
+		"url": "https://github.com/Pixel1917/azure-net-ui-kit/issues",
+		"email": "sank195951@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Pixel1917/azure-net-ui-kit.git"
+	},
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
 	},
 	"files": [
 		"dist",
@@ -75,6 +91,6 @@
 		"svelte"
 	],
 	"dependencies": {
-		"@azure-net/tools": "^1.2.2"
+		"@azure-net/tools": "^1.2.7"
 	}
 }
