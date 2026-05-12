@@ -19,3 +19,5 @@ export {
 } from './Modal/index.js';
 
 export { progressBar, useRouteLoadBar, type ProgressBarManager, type ProgressBarOptions } from './ProgressBar/index.js';
+
+export { Cropper, type CropperApi, type CropperExportOptions, type CropperProps, type CropRect } from './Cropper/index.js';

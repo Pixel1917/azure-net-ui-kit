@@ -7,12 +7,7 @@
 	const { transition = scale, transitionParams, modalStyles } = $derived(options);
 </script>
 
-<div
-	class="modal"
-	style={modalStyles}
-	in:transition|global={{ delay: 100, ...transitionParams }}
-	out:transition|global={{ delay: 100, ...transitionParams }}
->
+<div class="modal" style={modalStyles} transition:transition|global={{ delay: 100, ...transitionParams }}>
 	<button class="modal-close" onclick={() => closeModal()} aria-label="Close modal" type="button">
 		<span aria-hidden="true"></span>
 	</button>

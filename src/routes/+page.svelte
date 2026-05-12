@@ -11,7 +11,13 @@
 		component: import('./TestModal.svelte'),
 		props: { text: 'Hello world' },
 		useDefaultTemplate: true,
-		options: { injectModalStyles: { height: '50vh' }, transition: fly, closeOnEsc: false, closeOnOverlay: false, onClose: () => console.log('lol') }
+		options: {
+			injectModalStyles: { height: '50vh', backgroundColor: '#eee' },
+			transition: fly,
+			closeOnEsc: false,
+			closeOnOverlay: false,
+			onClose: () => console.log('lol')
+		}
 	});
 
 	const doSmth = () => {
@@ -20,7 +26,7 @@
 			component: import('./TestModal2.svelte'),
 			props: { text: 'Hello world' },
 			options: {
-				injectModalStyles: { height: '50vh' },
+				injectModalStyles: { height: '50vh', backgroundColor: '#ccc' },
 				transition: slide,
 				closeOnEsc: false,
 				closeOnOverlay: false,

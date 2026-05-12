@@ -1,6 +1,6 @@
 {
 	"name": "@azure-net/ui-kit",
-	"version": "0.1.7",
+	"version": "0.2.8",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -53,6 +53,7 @@
 		}
 	},
 	"peerDependencies": {
+		"@sveltejs/kit": ">=2.16.0",
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
