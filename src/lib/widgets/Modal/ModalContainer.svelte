@@ -11,6 +11,15 @@
 	const { wrapper, modal, overlay }: ModalContainerProps = $props();
 
 	let store = $state<IModalStore>();
+	let restoreOverflow = () => {};
+	let wrapperCount = 0;
+	const trackWrapper = () => {
+		wrapperCount++;
+		return () => {
+			wrapperCount--;
+			if (wrapperCount === 0) restoreOverflow();
+		};
+	};
 
 	const handleOverlayClick = (event: MouseEvent, modalItem: Modal) => {
 		if (modalItem.options.closeOnOverlay !== false) {
@@ -33,10 +42,13 @@
 		setStore(store);
 		document.addEventListener('keydown', handleEscape);
 		const savedOverflow = document.body.style.overflow;
+		restoreOverflow = () => {
+			if (!store?.modals.length) document.body.style.overflow = savedOverflow;
+		};
 		onOpenCloseHook(() => {
 			if (store?.modals && store.modals.length > 0) {
 				document.body.style.overflow = 'hidden';
-			} else {
+			} else if (!document.querySelector('.modal-wrapper')) {
 				document.body.style.overflow = savedOverflow;
 			}
 		});
@@ -49,11 +61,14 @@
 </script>
 
 {#if store?.modals && store.modals.length > 0}
-	<div style={store.overlayStyles} transition:fade={{ delay: 200 }}></div>
-	{#each store.modals as modalItem, index (modalItem.options.name)}
+	<div style={store.overlayStyles} in:fade={{ delay: 200 }} out:fade={{ duration: 200 }}></div>
+	{#each store.modals as modalItem (modalItem.options.name)}
 		<div
 			class="modal-wrapper"
-			style="{modalItem.options.wrapperStyles}; display: {index === store.modals.length - 1 ? 'flex' : 'none'}"
+			{@attach trackWrapper}
+			style="{modalItem.options.wrapperStyles}; display: {!store.has(modalItem.options.name) || store.current?.options.name === modalItem.options.name
+				? 'flex'
+				: 'none'}"
 			onclick={(e) => handleOverlayClick(e, modalItem)}
 			onkeydown={() => undefined}
 			role="dialog"

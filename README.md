@@ -63,3 +63,51 @@ To publish your library to [npm](https://www.npmjs.com):
 ```sh
 npm publish
 ```
+
+## Modal components
+
+`modalManager.create` prepares a handle; its `show()` opens the modal.
+`modalManager.show` opens immediately. Both infer props from a component,
+a `{ default: Component }` module, or a promise resolving either form.
+`create` is always synchronous. Only `show` becomes asynchronous for a promise input or a `loader`.
+Use `loader: () => import(...)` to start loading at show time (plain `import(...)` starts immediately).
+`component` and `loader` are mutually exclusive and both infer props:
+
+```ts
+import { modalManager } from '@azure-net/ui-kit/widgets';
+import Dialog from './Dialog.svelte';
+
+const prepared = modalManager.create({ component: Dialog, props: { title: 'Hello' } });
+prepared.show();
+
+const lazy = modalManager.create({
+	loader: () => import('./Dialog.svelte'),
+	props: { title: 'Hello' }
+});
+await lazy.show();
+
+await modalManager.show({ component: import('./Dialog.svelte'), props: { title: 'Hello' } });
+```
+
+Import failures reject the returned promise without opening a modal. A pending
+`show` cannot open in a container that was unmounted or replaced during loading.
+Opening requires a mounted `ModalContainer`; preparing a handle does not.
+
+## useAnimate
+
+```svelte
+<script lang="ts">
+	import { useAnimate } from '@azure-net/ui-kit';
+</script>
+
+<section use:useAnimate={{ classes: ['visible', 'fade-in'], delay: 100, once: true }}>Content</section>
+```
+
+The action adds classes when the element intersects its observer root. Supply your
+own CSS animations. Options: `classes`, `delay` (milliseconds), `root`, `rootMargin`,
+`threshold`, `once` (default `true`), and `enabled` (default `true`). With `once: false`,
+classes are removed on exit and added on re-entry. Delay is cancelled on exit.
+Updates replace options and cancel stale work. After a one-time reveal, updated
+classes apply immediately; use `once: false` to resume observation.
+Disabling removes action-owned classes. Existing classes are preserved during cleanup.
+Without IntersectionObserver, classes are applied immediately. SSR does nothing.

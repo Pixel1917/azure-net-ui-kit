@@ -12,9 +12,15 @@ type ExtractComponentProps<TComponent> =
 
 export interface IModalCreateConfig<TComponent> {
 	component: TComponent;
-	props?: Omit<ExtractComponentProps<TComponent>, 'closeModal' | 'options' | 'children' | 'update'>;
+	loader?: never;
+	props?: Omit<ExtractComponentProps<NoInfer<TComponent>>, 'closeModal' | 'options' | 'children' | 'update'>;
 	options?: ModalConfig;
 	useDefaultTemplate?: boolean;
+}
+
+export interface IModalLoaderConfig<TComponent> extends Omit<IModalCreateConfig<TComponent>, 'component' | 'loader'> {
+	component?: never;
+	loader: () => TComponent;
 }
 
 export interface IModalStore {
@@ -29,13 +35,23 @@ export interface IModalStore {
 	destroyAll(): void | Promise<void>;
 }
 
+export interface ModalHandle {
+	modal: Modal;
+	update: (updater: (modal: Modal) => Modal) => void;
+	destroy: () => Promise<void>;
+}
+export interface CreatedModalHandle<TShow = ModalHandle> {
+	show: () => TShow;
+	update: ModalHandle['update'];
+	destroy: ModalHandle['destroy'];
+}
+export type ModalResult<TComponent, TResult> = TComponent extends PromiseLike<unknown> ? Promise<TResult> : TResult;
+
 export interface IModalManager {
-	create<TComponent>(config: IModalCreateConfig<TComponent>): {
-		show: () => { modal: Modal; update: (updater: (modal: Modal) => Modal) => void; destroy: () => void };
-		update: (updater: (modal: Modal) => Modal) => void;
-		destroy: () => void;
-	};
-	show<TComponent>(config: IModalCreateConfig<TComponent>): { modal: Modal; update: (updater: (modal: Modal) => Modal) => void; destroy: () => void };
+	create<TComponent>(config: IModalCreateConfig<TComponent>): CreatedModalHandle<ModalResult<TComponent, ModalHandle>>;
+	create<TComponent>(config: IModalLoaderConfig<TComponent>): CreatedModalHandle<Promise<ModalHandle>>;
+	show<TComponent>(config: IModalCreateConfig<TComponent>): ModalResult<TComponent, ModalHandle>;
+	show<TComponent>(config: IModalLoaderConfig<TComponent>): Promise<ModalHandle>;
 	update(name: string, updater: (modal: Modal) => Modal): void;
 	has(name: string): boolean;
 	destroy(name?: string): void | Promise<void>;
@@ -118,7 +134,7 @@ export class ModalsStore implements IModalStore {
 		return this.modals.at(-1);
 	}
 
-	private toStoredModal<TComponent>(config: IModalCreateConfig<TComponent>) {
+	private toStoredModal(config: { component: unknown; props?: unknown; options?: ModalConfig; useDefaultTemplate?: boolean }) {
 		const modalStyles = mergeStyles(this.styles.modal, config.options?.injectModalStyles);
 		const wrapperStyles = mergeStyles(this.styles.wrapper, config.options?.injectWrapperStyles);
 		if (config.options?.scrollable) {
@@ -203,10 +219,14 @@ const createModalManager = () => {
 		hookHandler = hook;
 	};
 
-	const create = <TComponent>(config: IModalCreateConfig<TComponent>) => {
+	function create<TComponent>(config: IModalCreateConfig<TComponent>): CreatedModalHandle<ModalResult<TComponent, ModalHandle>>;
+	function create<TComponent>(config: IModalLoaderConfig<TComponent>): CreatedModalHandle<Promise<ModalHandle>>;
+	function create<TComponent>(
+		config: IModalCreateConfig<TComponent> | IModalLoaderConfig<TComponent>
+	): CreatedModalHandle<ModalHandle | Promise<ModalHandle>> {
 		const name = config.options?.name ?? generateName();
 		return {
-			show: () => show({ ...config, options: { ...config.options, name } }),
+			show: () => open({ ...config, options: { ...config.options, name } }),
 			update: (updater: (modal: Modal) => Modal) => {
 				if (!has(name)) {
 					console.info(`No modal with name ${name} opened`);
@@ -216,9 +236,9 @@ const createModalManager = () => {
 			},
 			destroy: () => destroy(name)
 		};
-	};
+	}
 
-	const show = <TComponent>(config: IModalCreateConfig<TComponent>) => {
+	const showResolved = <TComponent>(config: IModalCreateConfig<TComponent>): ModalHandle => {
 		if (!store) {
 			throw Error('Do not call show on server side or before mount');
 		}
@@ -226,6 +246,39 @@ const createModalManager = () => {
 		hookHandler?.('open');
 		return { modal, update: (updater: (modal: Modal) => Modal) => update(modal.options.name, updater), destroy: () => destroy(modal.options.name) };
 	};
+
+	function open<TComponent>(config: IModalCreateConfig<TComponent> | IModalLoaderConfig<TComponent>): ModalHandle | Promise<ModalHandle> {
+		const target = store;
+		const assertMounted = () => {
+			if (!target || target !== store) throw new Error('Do not call show on server side or before mount; modal container may have been unmounted');
+		};
+		const finish = (value: unknown) => {
+			assertMounted();
+			const component = resolveComponent(value);
+			if (typeof component !== 'function') throw new TypeError('Modal component must be a Svelte component or a module with a default component');
+			return showResolved({
+				component,
+				props: config.props,
+				options: config.options,
+				useDefaultTemplate: config.useDefaultTemplate
+			} as IModalCreateConfig<AnyComponent>);
+		};
+		if (config.loader !== undefined) {
+			return Promise.resolve()
+				.then(() => {
+					assertMounted();
+					if (config.component !== undefined) throw new TypeError('Use either component or loader, not both');
+					return config.loader!();
+				})
+				.then(finish);
+		}
+		return isThenable(config.component) ? Promise.resolve(config.component).then(finish) : finish(config.component);
+	}
+	function show<TComponent>(config: IModalCreateConfig<TComponent>): ModalResult<TComponent, ModalHandle>;
+	function show<TComponent>(config: IModalLoaderConfig<TComponent>): Promise<ModalHandle>;
+	function show<TComponent>(config: IModalCreateConfig<TComponent> | IModalLoaderConfig<TComponent>) {
+		return open(config);
+	}
 
 	const update = (name: string, updater: (modal: Modal) => Modal) => store?.update(name, updater);
 	const has = (name: string) => store?.has(name) ?? false;

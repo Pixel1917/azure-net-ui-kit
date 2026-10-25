@@ -8,7 +8,7 @@
 	const { create, show: showModal } = modalManager;
 
 	const testModal1 = create({
-		component: import('./TestModal.svelte'),
+		loader: () => import('./TestModal.svelte'),
 		props: { text: 'Hello world' },
 		useDefaultTemplate: true,
 		options: {
@@ -59,12 +59,12 @@
 
 <button onclick={() => destroyAll()}>destroy</button>
 
-<button onclick={() => testModal1.show()}>show test modal 1</button>
-<button class="btn-cls-modal" onclick={() => testModal1.destroy()}>destroy test modal 1</button>
+<button onclick={async () => testModal1.show()}>show test modal 1</button>
+<button class="btn-cls-modal" onclick={async () => (await testModal1).destroy()}>destroy test modal 1</button>
 <button
 	class="btn-upd-modal"
-	onclick={() =>
-		testModal1.update((modal) => {
+	onclick={async () =>
+		(await testModal1).update((modal) => {
 			if (modal.props) {
 				modal.props.text = 'Goodbye world';
 			}

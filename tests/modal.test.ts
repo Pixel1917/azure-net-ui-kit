@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'svelte';
 import { setBrowser } from './mocks/toolsEnvironment.js';
 
-const component = {} as Component<Record<string, unknown>, Record<string, unknown>, string>;
+const component = (() => ({})) as Component<Record<string, unknown>, Record<string, unknown>, string>;
 
 const importModalStore = async (browser = true) => {
 	vi.resetModules();
@@ -136,6 +136,140 @@ describe('Modal manager lifecycle', () => {
 		await modalManager.destroy('confirm');
 
 		expect(onClose).toHaveBeenCalledTimes(1);
+		destroyStore();
+	});
+});
+
+describe('modal component resolution', () => {
+	it('accepts components and module namespaces synchronously', async () => {
+		const { modalManager, setStore, ModalsStore, destroyStore } = await importModalStore();
+		setStore(new ModalsStore());
+		for (const input of [component, { default: component }]) {
+			const handle = modalManager.create({ component: input });
+			expect(handle).not.toBeInstanceOf(Promise);
+			expect(handle.show().modal.component).toBe(component);
+			expect(modalManager.show({ component: input }).modal.component).toBe(component);
+		}
+		destroyStore();
+	});
+	it('resolves lazy create without opening and lazy show before insertion', async () => {
+		const { modalManager, setStore, ModalsStore, destroyStore } = await importModalStore();
+		const store = new ModalsStore();
+		setStore(store);
+		const pending = modalManager.create({ component: Promise.resolve({ default: component }) });
+		expect(pending).not.toBeInstanceOf(Promise);
+		const handle = pending;
+		expect(store.modals).toHaveLength(0);
+		expect((await handle.show()).modal.component).toBe(component);
+		await handle.destroy();
+		const shown = modalManager.show({ component: Promise.resolve(component) });
+		expect(store.modals).toHaveLength(0);
+		expect((await shown).modal.component).toBe(component);
+		destroyStore();
+	});
+	it('rejects failed imports and does not open in a replacement container', async () => {
+		const { modalManager, setStore, ModalsStore, destroyStore } = await importModalStore();
+		setStore(new ModalsStore());
+		await expect(modalManager.show({ component: Promise.reject(new Error('load failed')) })).rejects.toThrow('load failed');
+		const pending = modalManager.show({ component: Promise.resolve({ default: component }) });
+		destroyStore();
+		const replacement = new ModalsStore();
+		setStore(replacement);
+		await expect(pending).rejects.toThrow('unmounted');
+		expect(replacement.modals).toHaveLength(0);
+		destroyStore();
+	});
+});
+
+describe('modal container lifecycle', () => {
+	it('renders a resolved module and restores scrolling on unmount', async () => {
+		const { mount, unmount, flushSync } = await import('svelte');
+		const { default: Container } = await import('../src/lib/widgets/Modal/ModalContainer.svelte');
+		const module = await import('../src/routes/TestModal.svelte');
+		const { modalManager } = await import('../src/lib/widgets/Modal/ModalStore.svelte.js');
+		// happy-dom rejects animation.finished on cancellation, unlike Svelte's test animation driver.
+		const animate = Element.prototype.animate;
+		const animationSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(function (this: Element, ...args) {
+			const animation = animate.apply(this, args);
+			void animation.finished.catch(() => {});
+			return animation;
+		});
+		const target = document.createElement('div');
+		document.body.append(target);
+		document.body.style.overflow = 'auto';
+		const app = mount(Container, { target });
+		flushSync();
+		try {
+			await modalManager.show({ component: Promise.resolve(module), props: { text: 'Lazy content' } });
+			flushSync();
+			expect(target.textContent).toContain('Lazy content');
+			expect(document.body.style.overflow).toBe('hidden');
+		} finally {
+			await unmount(app);
+			animationSpy.mockRestore();
+			target.remove();
+		}
+		expect(document.body.style.overflow).toBe('auto');
+	});
+});
+
+describe('lazy modal loader', () => {
+	it('create is synchronous and does not invoke the loader until show', async () => {
+		const { modalManager, ModalsStore, setStore, destroyStore } = await importModalStore();
+		const loader = vi.fn(async () => ({ default: component }));
+		const handle = modalManager.create({ loader });
+		expect(handle).not.toBeInstanceOf(Promise);
+		expect(loader).not.toHaveBeenCalled();
+		const store = new ModalsStore();
+		setStore(store);
+		const shown = handle.show();
+		expect(shown).toBeInstanceOf(Promise);
+		expect((await shown).modal.component).toBe(component);
+		expect(loader).toHaveBeenCalledTimes(1);
+		await handle.destroy();
+		await handle.show();
+		expect(loader).toHaveBeenCalledTimes(2);
+		destroyStore();
+	});
+	it('supports direct show with a sync loader and propagates loader failures', async () => {
+		const { modalManager, ModalsStore, setStore, destroyStore } = await importModalStore();
+		const store = new ModalsStore();
+		setStore(store);
+		expect((await modalManager.show({ loader: () => component })).modal.component).toBe(component);
+		await modalManager.destroyAll();
+		await expect(
+			modalManager.show({
+				loader: () => {
+					throw new Error('failed');
+				}
+			})
+		).rejects.toThrow('failed');
+		await expect(modalManager.show({ loader: async () => ({ default: null }) })).rejects.toThrow('Svelte component');
+		expect(store.modals).toHaveLength(0);
+		destroyStore();
+	});
+	it('never invokes a loader on the server or before mount', async () => {
+		const { modalManager } = await importModalStore();
+		const loader = vi.fn(async () => component);
+		const handle = modalManager.create({ loader });
+		await expect(handle.show()).rejects.toThrow('before mount');
+		expect(loader).not.toHaveBeenCalled();
+	});
+	it('does not open a lazy modal after its container has been replaced', async () => {
+		const { modalManager, ModalsStore, setStore, destroyStore } = await importModalStore();
+		setStore(new ModalsStore());
+		let resolve!: (value: typeof component) => void;
+		const promise = new Promise<typeof component>((done) => {
+			resolve = done;
+		});
+		const pending = modalManager.show({ loader: () => promise });
+		await Promise.resolve();
+		destroyStore();
+		const replacement = new ModalsStore();
+		setStore(replacement);
+		resolve(component);
+		await expect(pending).rejects.toThrow('unmounted');
+		expect(replacement.modals).toHaveLength(0);
 		destroyStore();
 	});
 });
