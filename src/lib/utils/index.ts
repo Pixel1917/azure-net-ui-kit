@@ -3,4 +3,4 @@ export { onClickOutside, type OnClickOutsideOptions, type OnClickOutsideEventDet
 export { masked, Mask, masks, type MaskedOptions, type MaskValue } from './mask/index.js';
 export { scrollTo, type ScrollToOptions } from './scrollTo/index.js';
 
-export { useAnimate, type UseAnimateOptions } from './useAnimate/index.js';
+export { useAnimate, attachAnimation, type UseAnimateOptions } from './useAnimate/index.js';

@@ -84,3 +84,40 @@ describe('useAnimate', () => {
 		expect(callbacks).toHaveLength(0);
 	});
 });
+
+describe('attachAnimation', () => {
+	it('cleans up on reactive reattachment and unmount', async () => {
+		const { mount, unmount, flushSync } = await import('svelte');
+		const { default: Harness } = await import('./fixtures/AnimationAttachment.svelte');
+		const target = document.createElement('div');
+		document.body.append(target);
+		const app = mount(Harness, { target });
+		flushSync();
+		node = target.querySelector('div')!;
+		emit(true);
+		app.updateOptions({ classes: 'second', delay: 50 });
+		flushSync();
+		expect(disconnect).toHaveBeenCalled();
+		emit(true, 0); // A queued callback from the disconnected observer must be ignored.
+		vi.advanceTimersByTime(100);
+		expect(node.className).toBe('original');
+		emit(true);
+		vi.advanceTimersByTime(50);
+		expect(node.className).toBe('original second');
+		app.updateOptions({ classes: 'third', delay: 100 });
+		flushSync();
+		emit(true);
+		await unmount(app);
+		vi.runAllTimers();
+		expect(node.className).toBe('original');
+		expect(vi.getTimerCount()).toBe(0);
+		target.remove();
+	});
+	it('can be created and disposed without browser globals', async () => {
+		const { attachAnimation } = await import('../src/lib/utils/useAnimate/index.js');
+		vi.stubGlobal('window', undefined);
+		const cleanup = attachAnimation({ classes: 'visible' })(undefined as unknown as HTMLElement);
+		expect(() => cleanup?.()).not.toThrow();
+		expect(callbacks).toHaveLength(0);
+	});
+});

@@ -111,3 +111,17 @@ Updates replace options and cancel stale work. After a one-time reveal, updated
 classes apply immediately; use `once: false` to resume observation.
 Disabling removes action-owned classes. Existing classes are preserved during cleanup.
 Without IntersectionObserver, classes are applied immediately. SSR does nothing.
+
+### Svelte attachments
+
+Use `attachAnimation` with Svelte 5 `@attach`:
+
+```svelte
+<a {@attach attachAnimation({ classes: 'reveal-visible', delay: 200 * index })} class="reveal-zoom-in" href="/catalog">Project</a>
+```
+
+Import `attachAnimation` from `@azure-net/ui-kit`. It accepts the same options as
+`useAnimate`. Reactive option changes recreate the attachment, disconnecting the
+previous observer, cancelling its timer and removing its owned classes first.
+Unmounting performs the same cleanup. `once` applies to each attachment lifecycle;
+changing options starts a new lifecycle. Existing `use:useAnimate` remains available.

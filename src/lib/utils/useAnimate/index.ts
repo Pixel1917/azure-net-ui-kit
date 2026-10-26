@@ -1,4 +1,5 @@
 import type { Action } from 'svelte/action';
+import type { Attachment } from 'svelte/attachments';
 
 export interface UseAnimateOptions {
 	classes?: string | string[];
@@ -105,3 +106,11 @@ export const useAnimate: Action<HTMLElement, UseAnimateOptions | undefined> = (n
 		}
 	};
 };
+
+/** Reactive attachment variant. Each reattachment gets a fresh animation lifecycle. */
+export const attachAnimation =
+	(options?: UseAnimateOptions): Attachment<HTMLElement> =>
+	(element) => {
+		const action = useAnimate(element, options);
+		return () => action?.destroy?.();
+	};
