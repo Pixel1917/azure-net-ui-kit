@@ -21,3 +21,5 @@ export {
 export { progressBar, useRouteLoadBar, type ProgressBarManager, type ProgressBarOptions } from './ProgressBar/index.js';
 
 export { Cropper, type CropperApi, type CropperExportOptions, type CropperProps, type CropRect } from './Cropper/index.js';
+
+export { Slider, type SliderApi, type SliderProps, type SliderLayout } from './Slider/index.js';

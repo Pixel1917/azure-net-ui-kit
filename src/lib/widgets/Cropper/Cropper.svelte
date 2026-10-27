@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { BROWSER } from '@azure-net/tools/environment';
-	import { onMount } from 'svelte';
-	import { createInitialCrop, cropToNaturalPixels, moveCrop, normalizeCrop, normalizeSize, resizeCrop } from './utils.js';
+	import { onMount, untrack } from 'svelte';
+	import { createInitialCrop, cropToNaturalPixels, fitCrop, moveCrop, normalizeCrop, normalizeSize, resizeCrop } from './utils.js';
 	import type { CropRect, CropperApi, CropperProps, CropperResizeHandle, CropperExportOptions } from './types.js';
 
 	type DragState =
@@ -21,6 +21,7 @@
 
 	const {
 		src,
+		crossOrigin,
 		aspectRatio,
 		initialCrop,
 		minWidth = 8,
@@ -41,11 +42,13 @@
 	}: CropperProps = $props();
 
 	let imageElement = $state<HTMLImageElement>();
-	let imageSrc = $state('');
+	let objectUrl = $state<string>();
+	const imageSrc = $derived(typeof src === 'string' ? src : (objectUrl ?? ''));
+	let loadedSource: string | Blob | undefined;
+	let activePointer: number | undefined;
 	let crop = $state<CropRect>({ x: 15, y: 15, width: 70, height: 70 });
 	let viewportRatio = $state(1);
 	let dragState: DragState | undefined;
-	let objectUrl: string | undefined;
 	let resizeObserver: ResizeObserver | undefined;
 
 	const handles: CropperResizeHandle[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
@@ -61,23 +64,24 @@
 	`);
 
 	const emitChange = (nextCrop: CropRect) => {
-		onChange?.(nextCrop);
+		onChange?.({ ...nextCrop });
 	};
 
 	const setCrop = (nextCrop: CropRect) => {
-		crop = normalizeCrop(nextCrop, minWidth, minHeight);
+		const fixedRatio = Number.isFinite(aspectRatio) && aspectRatio! > 0;
+		crop = normalizeCrop(nextCrop, fixedRatio ? 0.001 : minWidth, fixedRatio ? 0.001 : minHeight);
 		emitChange(crop);
 	};
 
 	const reset = () => {
-		setCrop(initialCrop ?? createInitialCrop(aspectRatio, viewportRatio));
+		setCrop(fitCrop(initialCrop ?? createInitialCrop(aspectRatio, viewportRatio), aspectRatio, viewportRatio, minWidth, minHeight));
 	};
 
 	const getImageRect = () => imageElement?.getBoundingClientRect();
 
 	const getPointerDelta = (event: PointerEvent, state: DragState) => {
 		const rect = getImageRect();
-		if (!rect) return { deltaX: 0, deltaY: 0 };
+		if (!rect?.width || !rect.height) return { deltaX: 0, deltaY: 0 };
 
 		return {
 			deltaX: ((event.clientX - state.startX) / rect.width) * 100,
@@ -86,7 +90,7 @@
 	};
 
 	const handlePointerMove = (event: PointerEvent) => {
-		if (!dragState || disabled) return;
+		if (!dragState || disabled || event.pointerId !== activePointer) return;
 		event.preventDefault();
 
 		const { deltaX, deltaY } = getPointerDelta(event, dragState);
@@ -110,15 +114,20 @@
 		);
 	};
 
-	const stopDragging = () => {
+	const stopDragging = (event?: PointerEvent) => {
+		if (event && event.pointerId !== activePointer) return;
+		activePointer = undefined;
 		dragState = undefined;
 		window.removeEventListener('pointermove', handlePointerMove);
 		window.removeEventListener('pointerup', stopDragging);
 		window.removeEventListener('pointercancel', stopDragging);
+		window.removeEventListener('blur', cancelDragging);
 	};
+	const cancelDragging = () => stopDragging();
 
 	const startDragging = (event: PointerEvent, nextDragState: DragState) => {
-		if (disabled) return;
+		if (disabled || event.button !== 0 || activePointer !== undefined) return;
+		activePointer = event.pointerId;
 		event.preventDefault();
 		event.stopPropagation();
 
@@ -126,6 +135,7 @@
 		window.addEventListener('pointermove', handlePointerMove);
 		window.addEventListener('pointerup', stopDragging);
 		window.addEventListener('pointercancel', stopDragging);
+		window.addEventListener('blur', cancelDragging);
 	};
 
 	const startMove = (event: PointerEvent) => {
@@ -154,17 +164,29 @@
 	};
 
 	const watchImageSize = () => {
-		if (!BROWSER || !imageElement) return;
+		if (!BROWSER || !imageElement || typeof ResizeObserver === 'undefined') return;
 		resizeObserver?.disconnect();
 		resizeObserver = new ResizeObserver(updateViewportRatio);
 		resizeObserver.observe(imageElement);
 	};
 
 	const handleImageLoad = () => {
-		if (!imageElement) return;
+		if (!imageElement?.naturalWidth || !imageElement.naturalHeight) return;
+		loadedSource = src;
+		viewportRatio = imageElement.naturalWidth / imageElement.naturalHeight;
 		updateViewportRatio();
 		watchImageSize();
 		reset();
+	};
+
+	const handleKeydown = (event: KeyboardEvent, handle?: CropperResizeHandle) => {
+		if (disabled || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const step = event.shiftKey ? 5 : 1;
+		const deltaX = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+		const deltaY = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+		setCrop(handle ? resizeCrop({ crop, handle, deltaX, deltaY, aspectRatio, viewportRatio, minWidth, minHeight }) : moveCrop(crop, deltaX, deltaY));
 	};
 
 	const getCanvasRadius = (width: number, height: number) => {
@@ -192,7 +214,7 @@
 	};
 
 	const toCanvas = (options: CropperExportOptions = {}) => {
-		if (!BROWSER || !imageElement) {
+		if (!BROWSER || !imageElement?.complete || !imageElement.naturalWidth || !imageElement.naturalHeight || loadedSource !== src) {
 			throw Error('Cropper can export only in browser environment after image load');
 		}
 
@@ -226,7 +248,7 @@
 	};
 
 	const api: CropperApi = {
-		getCrop: () => crop,
+		getCrop: () => ({ ...crop }),
 		reset,
 		toCanvas,
 		toDataUrl: (options = {}) => toCanvas(options).toDataURL(options.type ?? 'image/png', options.quality),
@@ -247,31 +269,37 @@
 	};
 
 	$effect(() => {
-		if (typeof src === 'string') {
-			imageSrc = src;
-			return;
-		}
+		if (typeof src === 'string') return;
+		const url = URL.createObjectURL(src);
+		objectUrl = url;
+		return () => URL.revokeObjectURL(url);
+	});
 
-		if (!BROWSER) return;
+	$effect(() => {
+		// A new source invalidates export and any in-progress gesture before its load event.
+		void imageSrc;
+		loadedSource = undefined;
+		untrack(stopDragging);
+		resizeObserver?.disconnect();
+	});
 
-		objectUrl = URL.createObjectURL(src);
-		imageSrc = objectUrl;
+	$effect(() => {
+		// Explicit configuration changes reset the selection, not ordinary container resizing.
+		void [aspectRatio, initialCrop, minWidth, minHeight];
+		untrack(reset);
+	});
 
-		return () => {
-			if (objectUrl) {
-				URL.revokeObjectURL(objectUrl);
-				objectUrl = undefined;
-			}
-		};
+	$effect(() => {
+		if (disabled) untrack(stopDragging);
 	});
 
 	onMount(() => {
+		if (imageElement?.complete) handleImageLoad();
 		onReady?.(api);
 
 		return () => {
 			stopDragging();
 			resizeObserver?.disconnect();
-			if (objectUrl) URL.revokeObjectURL(objectUrl);
 		};
 	});
 </script>
@@ -279,23 +307,39 @@
 <div class="cropper {containerClassName}" style={containerStyle}>
 	<div class="cropper-frame {className}">
 		{#if imageSrc}
-			<img bind:this={imageElement} class="cropper-image {imageClassName}" src={imageSrc} alt="" draggable="false" onload={handleImageLoad} />
-			<div
-				class="cropper-selection {grid ? 'cropper-selection-grid' : ''}"
-				style={cropStyle}
-				onpointerdown={startMove}
-				role="application"
-				aria-label="Image crop area"
-			>
-				{#each handles as handle (handle)}
-					<button
-						class="cropper-handle cropper-handle-{handle}"
-						style="--cropper-handle-color: {cropHandleColor}; --cropper-handle-size: {normalizeSize(cropHandleSize, '12px')};"
-						aria-label="Resize crop area {handle}"
-						onpointerdown={(event) => startResize(event, handle)}
-						type="button"
-					></button>
-				{/each}
+			<div class="cropper-image-frame">
+				<img
+					bind:this={imageElement}
+					class="cropper-image {imageClassName}"
+					crossorigin={crossOrigin}
+					src={imageSrc}
+					alt=""
+					draggable="false"
+					onload={handleImageLoad}
+				/>
+				<!-- This two-dimensional editor uses arrows to move, and focusable handles to resize. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+				<div
+					class="cropper-selection {grid ? 'cropper-selection-grid' : ''}"
+					style={cropStyle}
+					onpointerdown={startMove}
+					role="application"
+					tabindex={disabled ? -1 : 0}
+					onkeydown={(event) => handleKeydown(event)}
+					aria-label="Image crop area. Use arrow keys to move; focus a handle to resize. Hold Shift for larger steps."
+				>
+					{#each handles as handle (handle)}
+						<button
+							class="cropper-handle cropper-handle-{handle}"
+							style="--cropper-handle-color: {cropHandleColor}; --cropper-handle-size: {normalizeSize(cropHandleSize, '12px')};"
+							aria-label="Resize crop area {handle}"
+							onpointerdown={(event) => startResize(event, handle)}
+							onkeydown={(event) => handleKeydown(event, handle)}
+							type="button"
+							{disabled}
+						></button>
+					{/each}
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -325,6 +369,10 @@
 			-8px 0;
 		background-size: 16px 16px;
 		border-radius: var(--cropper_frame_radius, 18px);
+	}
+
+	.cropper-image-frame {
+		position: relative;
 	}
 
 	.cropper-image {

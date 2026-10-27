@@ -57,3 +57,36 @@ describe('Cropper utils', () => {
 		});
 	});
 });
+
+describe('Cropper regressions', () => {
+	it.each(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const)('keeps ratio and bounds for %s with impossible minimums', (handle) => {
+		const crop = resizeCrop({
+			crop: { x: 80, y: 80, width: 10, height: 10 },
+			handle,
+			deltaX: -500,
+			deltaY: 500,
+			aspectRatio: 2,
+			viewportRatio: 1,
+			minWidth: 80,
+			minHeight: 80
+		});
+		expect(crop.x).toBeGreaterThanOrEqual(0);
+		expect(crop.y).toBeGreaterThanOrEqual(0);
+		expect(crop.x + crop.width).toBeLessThanOrEqual(100);
+		expect(crop.y + crop.height).toBeLessThanOrEqual(100);
+		expect(crop.width / crop.height).toBeCloseTo(2);
+	});
+	it('ignores horizontal motion on a north-only resize handle', () => {
+		const crop = resizeCrop({
+			crop: { x: 25, y: 25, width: 50, height: 50 },
+			handle: 'n',
+			deltaX: 100,
+			deltaY: 0,
+			aspectRatio: 1,
+			viewportRatio: 1,
+			minWidth: 8,
+			minHeight: 8
+		});
+		expect(crop).toEqual({ x: 25, y: 25, width: 50, height: 50 });
+	});
+});

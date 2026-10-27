@@ -1,0 +1,24 @@
+/* Optional decoration. Structural scroll-snap layout stays in Slider.svelte. */
+.slider.styled > .slider-navigation,
+.slider.styled > .slider-pagination {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+.slider.styled > :is(.slider-navigation, .slider-pagination) > button {
+	font: inherit;
+	padding: 0.4em 0.75em;
+	border: 1px solid currentColor;
+	border-radius: 0.25rem;
+	color: inherit;
+	background: transparent;
+	cursor: pointer;
+}
+.slider.styled > :is(.slider-navigation, .slider-pagination) > button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.slider.styled > .slider-pagination > button[aria-current] {
+	font-weight: bold;
+	text-decoration: underline;
+}

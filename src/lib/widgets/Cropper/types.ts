@@ -24,6 +24,8 @@ export interface CropperExportOptions {
 
 export interface CropperProps {
 	src: string | Blob;
+	/** Required for canvas export of remote images; the server must also allow CORS. */
+	crossOrigin?: '' | 'anonymous' | 'use-credentials';
 	aspectRatio?: number;
 	initialCrop?: CropRect;
 	minWidth?: number;

@@ -125,3 +125,275 @@ Import `attachAnimation` from `@azure-net/ui-kit`. It accepts the same options a
 previous observer, cancelling its timer and removing its owned classes first.
 Unmounting performs the same cleanup. `once` applies to each attachment lifecycle;
 changing options starts a new lifecycle. Existing `use:useAnimate` remains available.
+
+## Slider (Svelte 5.29+)
+
+`Slider` is exported from `@azure-net/ui-kit/widgets`. It uses native horizontal
+scroll snap, not Swiper. Naming is inspired by the [official Swiper API](https://swiperjs.com/swiper-api),
+particularly `slidesPerView`, `spaceBetween`, numeric minimum-width `breakpoints`,
+and `slideNext` / `slidePrev` / `slideTo`. It is not a drop-in Swiper implementation.
+
+```svelte
+<script lang="ts">
+	import { Slider, type SliderApi } from '@azure-net/ui-kit/widgets';
+	import '@azure-net/ui-kit/slider.css'; // Optional decorations; use with styled.
+	const photos = [
+		{ id: 'a', src: '/a.jpg', alt: 'Garden' },
+		{ id: 'b', src: '/b.jpg', alt: 'Courtyard' },
+		{ id: 'c', src: '/c.jpg', alt: 'House' }
+	];
+	let slider = $state<SliderApi>();
+</script>
+
+<Slider
+	items={photos}
+	getKey={(photo) => photo.id}
+	slidesPerView={1}
+	spaceBetween={16}
+	breakpoints={{ 640: { slidesPerView: 2 }, 1024: { slidesPerView: 3, spaceBetween: 24 } }}
+	onReady={(api) => {
+		slider = api;
+	}}
+	label="Project photographs"
+	showNavigation
+	showPagination
+	styled
+>
+	{#snippet slide(photo, index)}
+		<img src={photo.src} alt={photo.alt} style="display:block;width:100%" />
+		<p>{index + 1}. {photo.alt}</p>
+	{/snippet}
+</Slider>
+<button type="button" disabled={!slider || slider.isBeginning} onclick={() => slider?.slidePrev()}>Previous photo</button>
+```
+
+For your own navigation and pagination, supply snippets instead of the default
+controls. Snippets receive the same stable API object as `onReady`:
+
+```svelte
+<Slider items={photos} getKey={(photo) => photo.id} slidesPerView={1}>
+	{#snippet slide(photo)}<img src={photo.src} alt={photo.alt} />{/snippet}
+	{#snippet navigation(api)}
+		<button type="button" disabled={api.isBeginning} onclick={api.slidePrev}>Back</button>
+		<button type="button" disabled={api.isEnd} onclick={api.slideNext}>Forward</button>
+	{/snippet}
+	{#snippet pagination(api)}
+		{#each Array.from({ length: api.pageCount }, (_, i) => i) as page (page)}
+			<button type="button" aria-current={api.activeIndex === page ? 'true' : undefined} onclick={() => api.slideTo(page)}>{page + 1}</button>
+		{/each}
+	{/snippet}
+</Slider>
+```
+
+- `items` and `slide` are required. Without `getKey`, slides use positional reuse
+  (index semantics), so duplicate primitives and repeated object references work.
+  Provide `getKey` with unique identifiers to preserve item identity during reorder.
+- Layout defaults: `slidesPerView: 1`, `spaceBetween: 0` (pixels). Fractional
+  positive slide counts are supported. Invalid counts/gaps fall back to 1/0.
+- Breakpoints are viewport-width CSS media queries, sorted numerically. Each
+  override merges with the base props, not with the preceding breakpoint.
+  Responsive CSS and slide content are emitted during SSR, before hydration.
+- `slideTo(index, behavior = 'smooth')` clamps to a valid **scroll position**;
+  `slideNext()` / `slidePrev()` move one position. End positions that would scroll
+  past the last slide are deduplicated, so `pageCount` can be less than item count.
+  `activeIndex`, `pageCount`, `isBeginning`, and `isEnd` are reactive getters.
+  During smooth navigation the boundary flags follow the requested target, allowing
+  rapid reversal before the first animation finishes; `activeIndex` follows scrolling.
+- `onReady(api)` runs after attachment (and again after layout-prop changes).
+  `onChange(index)` follows actual scrolling, not just button requests.
+  Geometry-dependent pagination starts empty during SSR and is measured on mount.
+- Native touch/trackpad scrolling works without JavaScript. A focused viewport
+  supports Left/Right/Home/End without intercepting keys in slide inputs.
+  Reduced-motion preferences disable smooth programmatic scrolling.
+- Only structural layout ships in the component. Import `@azure-net/ui-kit/slider.css`
+  separately and set `styled` to add basic styles to
+  built-in controls; `showNavigation` and `showPagination` default to false.
+  `navigation`/`pagination` snippets take precedence. Use `className` and the
+  `.slider-*` classes for customization. Custom snippets own their styles.
+- Scope: horizontal LTR, equal-width slides. No loop, autoplay, virtual slides,
+  mouse-drag emulation, vertical/RTL mode, or Swiper dependency. Browser-native
+  scroll timing is used. The generated inline stylesheet must be permitted by
+  your CSP (for example, an appropriate style hash policy).
+
+## Zoomable Attachment (Svelte 5.29+)
+
+Attach to a viewport with one **untransformed, top-left-aligned HTML child**.
+The viewport clips the child; only the child is transformed. Controls should be
+outside that child. Set explicit viewport dimensions and keep the child in normal
+block layout with no margins, transforms, or centered positioning.
+
+```svelte
+<script lang="ts">
+	import { createZoomable } from '@azure-net/ui-kit';
+	let { src, alt }: { src: string; alt: string } = $props();
+	const zoom = createZoomable({ minZoom: 1, maxZoom: 5, step: 1.25, duration: 160 });
+</script>
+
+{#key src}
+	<div class="viewport" {@attach zoom.attachment}>
+		<div><img {src} {alt} draggable="false" style="display:block;width:100%" /></div>
+	</div>
+{/key}
+<button type="button" onclick={zoom.zoomIn}>Zoom in</button>
+<button type="button" onclick={zoom.zoomOut}>Zoom out</button>
+<button type="button" onclick={zoom.reset}>Reset</button>
+
+<style>
+	.viewport {
+		width: 100%;
+		height: 400px;
+	}
+</style>
+```
+
+For gesture-only use: `import { zoomable } from '@azure-net/ui-kit'`, then
+`<div {@attach zoomable({ maxZoom: 4 })}><div>Content</div></div>`.
+
+`createZoomable(options)` is safe during SSR and returns a stable controller:
+`attachment`, `zoomIn()`, `zoomOut()`, `zoomTo(scale, point?)`, `panBy(x, y)`,
+`reset()`, `getTransform()`. A point is in viewport-local CSS pixels; omitted
+points use its center. `getTransform()` returns a defensive `{ x, y, scale }`
+copy of the target transform (not the in-flight animation frame). Use
+`onChange(transform)` to synchronize your own UI state. Methods do nothing before
+mount and after cleanup; remounting resets the transform. One controller can be
+attached to only one viewport at a time.
+
+Options: `minZoom` (1), `maxZoom` (5), multiplicative `step` (1.25), `wheel`
+(true), `wheelSpeed` (0.002), `duration` (160 milliseconds, 0 for immediate),
+`bounds` (true), and `onChange`. Bounds center content smaller than the viewport
+and constrain larger content; ResizeObserver recalculates after image loading or
+resizing. Without ResizeObserver, window resizing still recalculates bounds.
+Use stable options for a controller; recreate it to change configuration. Reactive
+options passed to `zoomable(...)` recreate that attachment and reset its transform.
+
+Mouse/touch/pen panning uses pointer capture. Two-finger pinch keeps the gesture's
+focal point and allows translation. Wheel deltas support pixel/line/page modes;
+wheel scrolling is not prevented when already at a zoom limit. Button/wheel zoom
+animates; active pointer gestures follow immediately. Reduced motion is honored.
+Cleanup cancels animation frames, releases captures, disconnects observers,
+removes all listeners, and restores the inline styles owned by the attachment.
+
+Limits: dedicated HTML viewport only, no SVG controller, inertia, double-tap zoom,
+or support for transformed ancestors. The first child must exist when attached;
+key the viewport when replacing content. Touch gestures consume touch scrolling
+inside the viewport. This is not a general-purpose replacement for every panzoom
+feature, and introduces no runtime dependency.
+
+## clickOutside Attachment
+
+The existing `use:onClickOutside` action and `outside` custom event remain available.
+The attachment adds a direct callback using the same event handling:
+
+```svelte
+<script lang="ts">
+	import { clickOutside } from '@azure-net/ui-kit';
+	let open = $state(false);
+	let trigger = $state<HTMLButtonElement>();
+</script>
+
+<button
+	bind:this={trigger}
+	type="button"
+	onclick={() => {
+		open = !open;
+	}}>Toggle</button
+>
+{#if open}
+	<div
+		{@attach clickOutside({
+			initiator: trigger,
+			onOutside: () => {
+				open = false;
+			}
+		})}
+	>
+		Panel contents
+	</div>
+{/if}
+```
+
+Options: `initiator`, `enabled` (true), `event` ('click'; also 'pointerdown',
+'mousedown', 'touchstart'), `capture` (true), `passive` (true), `onOutside(detail)`.
+The callback receives `{ node, initiator, originalEvent }`. Inside clicks and
+initiator descendants are ignored, including composed shadow-DOM paths. Listeners
+use the element's owner document, including iframe documents. Reactive attachment
+options replace listeners and unmount removes them. The action's `update` also
+rebinds when `passive` changes. With `passive: false`, the callback may prevent the
+original event; defaults are intentionally passive. No global DOM is read on import.
+
+## Cropper
+
+```svelte
+<script lang="ts">
+	import { Cropper, type CropperApi } from '@azure-net/ui-kit/widgets';
+	let api = $state<CropperApi>();
+	let readyToExport = $state(false);
+</script>
+
+<Cropper
+	src="/photo.jpg"
+	aspectRatio={1}
+	minWidth={8}
+	minHeight={8}
+	onReady={(value) => {
+		api = value;
+	}}
+/>
+<button
+	type="button"
+	onclick={async () => {
+		try {
+			const blob = await api?.toBlob({ type: 'image/png', rounded: false });
+			readyToExport = !!blob;
+			// Upload or otherwise consume the blob here.
+		} catch {
+			readyToExport = false; // Not loaded yet, failed image, or a canvas security error.
+		}
+	}}>Export crop</button
+>
+<p>{readyToExport ? 'Exported' : 'Choose a crop and export when the image is loaded'}</p>
+```
+
+Coordinates and minimum sizes are percentages of the **image**, not its padded or
+minimum-height frame. `aspectRatio` is the width/height ratio in displayed pixels.
+When a fixed ratio and minimum size cannot fit together, image bounds and ratio
+win. `initialCrop` is normalized to these constraints. Changing configuration
+(`initialCrop`, ratio, minimums) resets the selection; ordinary responsive resizing
+does not. Arrow keys move the focused selection or resize a focused handle; Shift
+uses a larger step. Disabled controls cannot begin gestures.
+
+`onReady` supplies the API on mount, not an image-load guarantee. Export throws
+(or `toBlob` rejects) until the current source is loaded. `getCrop()` and
+`onChange` values are copies. `reset()`, `toCanvas()`, `toBlob()`, and `toDataUrl()`
+remain available. Source changes cancel gestures and invalidate old exports;
+Blob URLs are revoked on replacement/unmount. Remote canvas export requires
+`crossOrigin="anonymous"` (or appropriate credentials) **and** matching server CORS
+headers. Canvas security errors propagate. Export rounds to natural image pixels,
+so very small crops have a one-pixel minimum. Existing visual styles are retained.
+
+## Regression Tests
+
+Run from this package, using installed tools without modifying dependencies:
+
+```sh
+npm run check
+./node_modules/.bin/vitest run
+npm run prepack
+```
+
+The standalone browser harness uses Playwright if separately available:
+
+```sh
+node tests/browser/run.mjs
+# Or point to an existing runtime and browser without adding dependencies:
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+PLAYWRIGHT_EXECUTABLE=/absolute/path/to/chromium \
+node tests/browser/run.mjs
+```
+
+It runs a temporary localhost server, checks SSR CSS with JavaScript disabled at
+mobile/desktop widths, hydrates in Chromium, then exercises navigation, reactive
+layout/items, keyboard isolation, wheel, real mouse pan, CDP two-finger pinch,
+Cropper geometry/export/keyboard, clickOutside updates, and unmount. Unit tests
+cover bounds, ratio math, invalid input, pointer isolation, and cleanup. Chromium
+coverage does not establish Safari/Firefox or physical-device compatibility.

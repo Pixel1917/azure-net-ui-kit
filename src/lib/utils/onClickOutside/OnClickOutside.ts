@@ -1,4 +1,4 @@
-import { BROWSER } from '@azure-net/tools/environment';
+import type { Attachment } from 'svelte/attachments';
 
 export type OnClickOutsideEventType = 'click' | 'pointerdown' | 'mousedown' | 'touchstart';
 
@@ -8,6 +8,7 @@ export type OnClickOutsideOptions = {
 	event?: OnClickOutsideEventType;
 	capture?: boolean;
 	passive?: boolean;
+	onOutside?: (detail: OnClickOutsideEventDetail) => void;
 };
 
 export type OnClickOutsideEventDetail = {
@@ -22,10 +23,11 @@ type ResolvedOnClickOutsideOptions = {
 	event: OnClickOutsideEventType;
 	capture: boolean;
 	passive: boolean;
+	onOutside?: (detail: OnClickOutsideEventDetail) => void;
 };
 
 const resolveOptions = (initiatorOrOptions?: HTMLElement | OnClickOutsideOptions): ResolvedOnClickOutsideOptions => {
-	if (initiatorOrOptions instanceof HTMLElement) {
+	if (initiatorOrOptions && 'nodeType' in initiatorOrOptions) {
 		return {
 			initiator: initiatorOrOptions,
 			enabled: true,
@@ -40,7 +42,8 @@ const resolveOptions = (initiatorOrOptions?: HTMLElement | OnClickOutsideOptions
 		enabled: initiatorOrOptions?.enabled ?? true,
 		event: initiatorOrOptions?.event ?? 'click',
 		capture: initiatorOrOptions?.capture ?? true,
-		passive: initiatorOrOptions?.passive ?? true
+		passive: initiatorOrOptions?.passive ?? true,
+		onOutside: initiatorOrOptions?.onOutside
 	};
 };
 
@@ -49,7 +52,7 @@ const hasNodeInPath = (path: EventTarget[], node: HTMLElement | null): boolean =
 };
 
 export const onClickOutside = (node: HTMLElement, initiatorOrOptions?: HTMLElement | OnClickOutsideOptions) => {
-	if (!BROWSER || typeof document === 'undefined') {
+	if (!node?.ownerDocument?.defaultView) {
 		return {
 			update() {},
 			destroy() {}
@@ -57,25 +60,26 @@ export const onClickOutside = (node: HTMLElement, initiatorOrOptions?: HTMLEleme
 	}
 
 	let options = resolveOptions(initiatorOrOptions);
+	const document = node.ownerDocument;
+	const view = document.defaultView!;
 
 	const listener = (event: Event): void => {
 		if (!options.enabled) return;
-		if (!(event.target instanceof Node)) return;
+		if (!(event.target instanceof view.Node)) return;
 
 		const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-		if (event.target === node || hasNodeInPath(path, node) || hasNodeInPath(path, options.initiator)) {
+		if (
+			node.contains(event.target) ||
+			options.initiator?.contains(event.target) ||
+			hasNodeInPath(path, node) ||
+			hasNodeInPath(path, options.initiator)
+		) {
 			return;
 		}
 
-		node.dispatchEvent(
-			new CustomEvent<OnClickOutsideEventDetail>('outside', {
-				detail: {
-					node,
-					initiator: options.initiator ?? undefined,
-					originalEvent: event
-				}
-			})
-		);
+		const detail = { node, initiator: options.initiator ?? undefined, originalEvent: event };
+		options.onOutside?.(detail);
+		node.dispatchEvent(new view.CustomEvent('outside', { detail }));
 	};
 
 	const bind = () => {
@@ -96,7 +100,7 @@ export const onClickOutside = (node: HTMLElement, initiatorOrOptions?: HTMLEleme
 			const prev = options;
 			options = resolveOptions(next);
 
-			if (prev.event !== options.event || prev.capture !== options.capture) {
+			if (prev.event !== options.event || prev.capture !== options.capture || prev.passive !== options.passive) {
 				unbind(prev.event, prev.capture);
 				bind();
 			}
@@ -106,3 +110,9 @@ export const onClickOutside = (node: HTMLElement, initiatorOrOptions?: HTMLEleme
 		}
 	};
 };
+
+/** Reactive options recreate the listener; the legacy action remains available. */
+export const clickOutside =
+	(options: OnClickOutsideOptions = {}): Attachment<HTMLElement> =>
+	(node) =>
+		onClickOutside(node, options).destroy;

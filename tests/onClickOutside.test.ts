@@ -73,3 +73,38 @@ describe('onClickOutside', () => {
 		expect(listener).not.toHaveBeenCalled();
 	});
 });
+
+describe('clickOutside attachment', () => {
+	it('invokes callback, ignores descendants without composedPath and cleans up', async () => {
+		const { clickOutside } = await import('../src/lib/utils/onClickOutside/OnClickOutside.js');
+		const node = document.createElement('div');
+		const child = document.createElement('span');
+		node.append(child);
+		document.body.append(node);
+		const add = vi.spyOn(document, 'addEventListener');
+		const onOutside = vi.fn();
+		const cleanup = clickOutside({ onOutside })(node);
+		const listener = add.mock.calls.find(([type]) => type === 'click')![1] as EventListener;
+		const inside = new MouseEvent('click', { bubbles: true });
+		Object.defineProperty(inside, 'composedPath', { value: undefined });
+		Object.defineProperty(inside, 'target', { value: child });
+		listener(inside);
+		add.mockRestore();
+		expect(onOutside).not.toHaveBeenCalled();
+		document.body.click();
+		expect(onOutside).toHaveBeenCalledTimes(1);
+		cleanup?.();
+		document.body.click();
+		expect(onOutside).toHaveBeenCalledTimes(1);
+	});
+	it('rebinds when passive changes', () => {
+		const node = document.createElement('div');
+		document.body.append(node);
+		const remove = vi.spyOn(document, 'removeEventListener');
+		const action = onClickOutside(node, { passive: true });
+		action.update({ passive: false });
+		expect(remove).toHaveBeenCalledWith('click', expect.any(Function), true);
+		action.destroy();
+		remove.mockRestore();
+	});
+});

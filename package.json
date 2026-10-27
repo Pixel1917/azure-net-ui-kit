@@ -1,6 +1,6 @@
 {
 	"name": "@azure-net/ui-kit",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -43,6 +43,7 @@
 	"types": "./dist/index.d.ts",
 	"type": "module",
 	"exports": {
+		"./slider.css": "./dist/widgets/Slider/slider.css",
 		".": {
 			"types": "./dist/index.d.ts",
 			"svelte": "./dist/index.js"
@@ -54,7 +55,7 @@
 	},
 	"peerDependencies": {
 		"@sveltejs/kit": ">=2.16.0",
-		"svelte": "^5.0.0"
+		"svelte": "^5.29.0"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",
