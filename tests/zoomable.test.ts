@@ -10,7 +10,7 @@ beforeEach(() => {
 	viewport.append(content);
 	document.body.append(viewport);
 	Object.defineProperties(viewport, { clientWidth: { value: 200 }, clientHeight: { value: 100 } });
-	Object.defineProperties(content, { offsetWidth: { value: 200 }, offsetHeight: { value: 100 } });
+	Object.defineProperties(content, { offsetWidth: { value: 200, configurable: true }, offsetHeight: { value: 100, configurable: true } });
 	viewport.setPointerCapture = vi.fn();
 	viewport.hasPointerCapture = vi.fn(() => false);
 });
@@ -24,6 +24,30 @@ function pointer(type: string, id: number, x: number, y: number) {
 	viewport.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true }));
 }
 describe('zoomable', () => {
+	it.each(['center', 'top', 'bottom'] as const)('aligns smaller content at %s and restores alignment after reset', (align) => {
+		Object.defineProperties(content, { offsetWidth: { value: 80 }, offsetHeight: { value: 40 } });
+		const expectedY = align === 'top' ? 0 : align === 'bottom' ? 60 : 30;
+		const controller = createZoomable({ align, duration: 0 });
+		cleanup = controller.attachment(viewport);
+		expect(controller.getTransform()).toEqual({ x: 60, y: expectedY, scale: 1 });
+		controller.zoomTo(4);
+		controller.panBy(-100, -100);
+		controller.reset();
+		expect(controller.getTransform()).toEqual({ x: 60, y: expectedY, scale: 1 });
+		Object.defineProperty(content, 'offsetHeight', { value: 60 });
+		window.dispatchEvent(new Event('resize'));
+		expect(controller.getTransform().y).toBe(align === 'top' ? 0 : align === 'bottom' ? 40 : 20);
+	});
+	it('compensates existing layout offsets and restores viewport positioning', () => {
+		Object.defineProperties(content, { offsetLeft: { value: 25 }, offsetTop: { value: 30 } });
+		const controller = createZoomable({ duration: 0 });
+		cleanup = controller.attachment(viewport);
+		expect(content.style.transform).toContain('translate3d(-25px, -30px, 0)');
+		expect(viewport.style.position).toBe('relative');
+		cleanup?.();
+		cleanup = undefined;
+		expect(viewport.style.position).toBe('');
+	});
 	it('constructs without DOM and ignores controller calls before attachment', () => {
 		const controller = createZoomable();
 		controller.zoomIn();

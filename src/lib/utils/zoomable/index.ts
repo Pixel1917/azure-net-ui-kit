@@ -17,7 +17,9 @@ export interface ZoomableOptions {
 	wheel?: boolean;
 	wheelSpeed?: number;
 	duration?: number;
-	/** Keep content inside its viewport; small content stays centered. */
+	/** Vertical alignment on mount/reset and while content fits. Defaults to center. */
+	align?: 'center' | 'top' | 'bottom';
+	/** Keep content inside its viewport; small content follows align. */
 	bounds?: boolean;
 	onChange?: (transform: ZoomTransform) => void;
 }
@@ -37,6 +39,7 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 	const min = positive(options.minZoom, 1);
 	const max = Math.max(min, positive(options.maxZoom, 5));
 	const step = positive(options.step, 1.25);
+	const alignment = options.align === 'top' ? 0 : options.align === 'bottom' ? 1 : 0.5;
 	let transform: ZoomTransform = { x: 0, y: 0, scale: min };
 	let controls: Pick<ZoomController, 'zoomTo' | 'panBy' | 'reset'> | undefined;
 	const controller: ZoomController = {
@@ -58,12 +61,16 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 			content.style.transformOrigin,
 			content.style.willChange,
 			viewport.style.touchAction,
-			viewport.style.overflow
+			viewport.style.overflow,
+			viewport.style.position
 		];
 		content.style.transformOrigin = '0 0';
 		content.style.willChange = 'transform';
 		viewport.style.touchAction = 'none';
 		viewport.style.overflow = 'hidden';
+		if (view.getComputedStyle(viewport).position === 'static' || !view.getComputedStyle(viewport).position) viewport.style.position = 'relative';
+		let originX = content.offsetLeft;
+		let originY = content.offsetTop;
 		let frame = 0;
 		let disposed = false;
 		let rendered = { ...transform };
@@ -74,16 +81,24 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 		const duration = options.duration === 0 ? 0 : positive(options.duration, 160);
 		function constrain(next: ZoomTransform) {
 			if (options.bounds === false) return next;
-			const axis = (value: number, size: number, available: number) =>
-				size <= available ? (available - size) / 2 : Math.min(0, Math.max(available - size, value));
+			const axis = (value: number, size: number, available: number, align: number) =>
+				size <= available ? (available - size) * align : Math.min(0, Math.max(available - size, value));
 			return {
 				...next,
-				x: axis(next.x, content!.offsetWidth * next.scale, viewport.clientWidth),
-				y: axis(next.y, content!.offsetHeight * next.scale, viewport.clientHeight)
+				x: axis(next.x, content!.offsetWidth * next.scale, viewport.clientWidth, 0.5),
+				y: axis(next.y, content!.offsetHeight * next.scale, viewport.clientHeight, alignment)
+			};
+		}
+		function initialTransform(): ZoomTransform {
+			return {
+				x: (viewport.clientWidth - content!.offsetWidth * min) / 2,
+				y: (viewport.clientHeight - content!.offsetHeight * min) * alignment,
+				scale: min
 			};
 		}
 		function draw() {
-			content!.style.transform = `translate3d(${rendered.x}px, ${rendered.y}px, 0) scale(${rendered.scale})`;
+			// Compensate for flex/grid alignment and margins instead of adding them twice.
+			content!.style.transform = `translate3d(${rendered.x - originX}px, ${rendered.y - originY}px, 0) scale(${rendered.scale})`;
 		}
 		function animate(time: number) {
 			frame = 0;
@@ -123,7 +138,7 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 		controls = {
 			zoomTo: zoom,
 			panBy: (x, y) => set({ ...transform, x: transform.x + x, y: transform.y + y }, true),
-			reset: () => set({ x: 0, y: 0, scale: min }, true)
+			reset: () => set(initialTransform(), true)
 		};
 		function point(event: MouseEvent): ZoomPoint {
 			const rect = viewport.getBoundingClientRect();
@@ -184,6 +199,8 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 			event.preventDefault();
 		}
 		function resize() {
+			originX = content!.offsetLeft;
+			originY = content!.offsetTop;
 			set(transform);
 		}
 		viewport.addEventListener('pointerdown', down);
@@ -198,7 +215,7 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 		const observer = typeof view.ResizeObserver === 'function' ? new view.ResizeObserver(resize) : undefined;
 		observer?.observe(viewport);
 		observer?.observe(content);
-		set({ x: 0, y: 0, scale: min });
+		set(initialTransform());
 		return () => {
 			disposed = true;
 			controls = undefined;
@@ -214,7 +231,14 @@ export function createZoomable(options: ZoomableOptions = {}): ZoomController {
 			viewport.removeEventListener('dragstart', preventDrag);
 			view.removeEventListener('blur', release);
 			view.removeEventListener('resize', resize);
-			[content.style.transform, content.style.transformOrigin, content.style.willChange, viewport.style.touchAction, viewport.style.overflow] = saved;
+			[
+				content.style.transform,
+				content.style.transformOrigin,
+				content.style.willChange,
+				viewport.style.touchAction,
+				viewport.style.overflow,
+				viewport.style.position
+			] = saved;
 		};
 	}
 	return controller;

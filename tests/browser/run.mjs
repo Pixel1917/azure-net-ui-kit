@@ -164,6 +164,44 @@ try {
 	await page.evaluate(() => window.harness.setItems([]));
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 0);
 
+	const alignmentResults = await page.evaluate(async () => {
+		const { createZoomable } = await import('/src/lib/utils/zoomable/index.ts');
+		const results = [];
+		for (const align of ['center', 'top', 'bottom']) {
+			const viewport = document.createElement('div');
+			viewport.style.cssText = 'width:300px;height:400px;display:flex;align-items:flex-end;justify-content:center;border:2px solid black';
+			const content = document.createElement('div');
+			content.style.cssText = 'width:200px;height:100px;flex-shrink:0';
+			viewport.append(content);
+			document.body.append(viewport);
+			const zoom = createZoomable({ align, duration: 0 });
+			const cleanup = zoom.attachment(viewport);
+			const position = () => {
+				const parent = viewport.getBoundingClientRect(),
+					child = content.getBoundingClientRect();
+				return [child.left - parent.left - viewport.clientLeft, child.top - parent.top - viewport.clientTop];
+			};
+			const initial = position();
+			zoom.zoomTo(5);
+			zoom.reset();
+			const reset = position();
+			content.style.height = '200px';
+			await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+			const resized = position();
+			cleanup();
+			results.push({ align, initial, reset, resized, positionRestored: viewport.style.position === '' });
+			viewport.remove();
+		}
+		return results;
+	});
+	for (const result of alignmentResults) {
+		const y = result.align === 'top' ? 0 : result.align === 'bottom' ? 300 : 150;
+		assert.deepEqual(result.initial, [50, y], `flex-end content aligned ${result.align}`);
+		assert.deepEqual(result.reset, [50, y]);
+		assert.deepEqual(result.resized, [50, result.align === 'top' ? 0 : result.align === 'bottom' ? 200 : 100]);
+		assert.equal(result.positionRestored, true);
+	}
+
 	await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
 	assert.equal(await page.evaluate(() => window.harness.getZoom().getTransform().scale), 1.25);
 	const zoomRect = await page.locator('.zoom').boundingBox();

@@ -217,16 +217,18 @@ controls. Snippets receive the same stable API object as `onReady`:
 
 ## Zoomable Attachment (Svelte 5.29+)
 
-Attach to a viewport with one **untransformed, top-left-aligned HTML child**.
+Attach to a viewport with one **untransformed HTML child**.
 The viewport clips the child; only the child is transformed. Controls should be
-outside that child. Set explicit viewport dimensions and keep the child in normal
-block layout with no margins, transforms, or centered positioning.
+outside that child. Set explicit viewport dimensions. Flex/grid alignment and
+layout offsets are compensated; do not apply separate transforms to the child.
+The first child is the zoom target: align positions its box, not an image inside
+a full-height wrapper.
 
 ```svelte
 <script lang="ts">
 	import { createZoomable } from '@azure-net/ui-kit';
 	let { src, alt }: { src: string; alt: string } = $props();
-	const zoom = createZoomable({ minZoom: 1, maxZoom: 5, step: 1.25, duration: 160 });
+	const zoom = createZoomable({ minZoom: 1, maxZoom: 5, step: 1.25, duration: 160, align: 'center' });
 </script>
 
 {#key src}
@@ -260,8 +262,11 @@ attached to only one viewport at a time.
 
 Options: `minZoom` (1), `maxZoom` (5), multiplicative `step` (1.25), `wheel`
 (true), `wheelSpeed` (0.002), `duration` (160 milliseconds, 0 for immediate),
-`bounds` (true), and `onChange`. Bounds center content smaller than the viewport
-and constrain larger content; ResizeObserver recalculates after image loading or
+`align` ('center'), `bounds` (true), and `onChange`. `align` accepts 'center',
+'top', or 'bottom' for vertical placement; horizontal placement is centered.
+Mount and reset apply alignment even with bounds disabled. With bounds enabled,
+small content stays aligned; larger content can be panned within its bounds.
+ResizeObserver recalculates after image loading or
 resizing. Without ResizeObserver, window resizing still recalculates bounds.
 Use stable options for a controller; recreate it to change configuration. Reactive
 options passed to `zoomable(...)` recreate that attachment and reset its transform.
