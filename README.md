@@ -212,7 +212,9 @@ controls. Snippets receive the same stable API object as `onReady`:
   separately and set `styled` to add basic styles to
   built-in controls; `showNavigation` and `showPagination` default to false.
   `navigation`/`pagination` snippets take precedence. Use `className` and the
-  `.slider-*` classes for customization. Custom snippets own their styles.
+  `.azure-net-ui-slider-*` classes for customization. The root class is
+  `azure-net-ui-slider`; the old generic `slider` classes are no longer emitted.
+  Custom snippets own their styles.
 - Scope: horizontal LTR, equal-width slides. No loop, autoplay, virtual slides,
   vertical/RTL mode, or Swiper dependency. Browser-native
   scroll timing is used. The generated inline stylesheet must be permitted by

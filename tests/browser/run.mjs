@@ -42,12 +42,12 @@ try {
 	const noJS = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 1000 } });
 	const ssr = await noJS.newPage();
 	await ssr.goto(url);
-	const desktop = await ssr.locator('.slider-slide').first().boundingBox();
-	const desktopViewport = await ssr.locator('.slider-viewport').boundingBox();
+	const desktop = await ssr.locator('.azure-net-ui-slider-slide').first().boundingBox();
+	const desktopViewport = await ssr.locator('.azure-net-ui-slider-viewport').boundingBox();
 	assert.ok(Math.abs(desktop.width - (desktopViewport.width - 24) / 3) < 1, 'desktop SSR 3 columns before JS');
 	await ssr.setViewportSize({ width: 390, height: 900 });
-	const mobile = await ssr.locator('.slider-slide').first().boundingBox();
-	const mobileViewport = await ssr.locator('.slider-viewport').boundingBox();
+	const mobile = await ssr.locator('.azure-net-ui-slider-slide').first().boundingBox();
+	const mobileViewport = await ssr.locator('.azure-net-ui-slider-viewport').boundingBox();
 	assert.ok(Math.abs(mobile.width - mobileViewport.width) < 1, 'mobile SSR 1 column before JS');
 	await noJS.close();
 
@@ -61,13 +61,38 @@ try {
 	await page.goto(url);
 	await page.waitForSelector('html[data-hydrated="true"]');
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 3);
-	assert.equal(await page.locator('.slider-viewport').evaluate((node) => getComputedStyle(node).scrollbarWidth), 'none');
-	const dragRect = await page.locator('.slider-viewport').boundingBox();
+	assert.equal(await page.locator('.azure-net-ui-slider-viewport').evaluate((node) => getComputedStyle(node).scrollbarWidth), 'none');
+	const dragRect = await page.locator('.azure-net-ui-slider-viewport').boundingBox();
+	await page.emulateMedia({ reducedMotion: 'no-preference' });
 	await page.mouse.move(dragRect.x + 500, dragRect.y + 70);
 	await page.mouse.down();
-	await page.mouse.move(dragRect.x + 200, dragRect.y + 70, { steps: 12 });
+	await page.mouse.move(dragRect.x + 420, dragRect.y + 70, { steps: 8 });
+	await page.evaluate(() => {
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
+		window.dragSamples = [node.scrollLeft];
+		window.dragSampling = true;
+		const sample = () => {
+			window.dragSamples.push(node.scrollLeft);
+			if (window.dragSampling) requestAnimationFrame(sample);
+		};
+		requestAnimationFrame(sample);
+	});
 	await page.mouse.up();
-	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 1);
+	await page.waitForFunction(() => {
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
+		return window.harness.getSlider().activeIndex === 1 && node.style.scrollSnapType === '';
+	});
+	const samples = await page.evaluate(() => {
+		window.dragSampling = false;
+		return window.dragSamples;
+	});
+	assert.ok(samples[0] > 50, 'drag moved partway toward second slide');
+	assert.ok(
+		samples.every((x) => x >= samples[0] - 1),
+		'release never jumps back to the first slide'
+	);
+	assert.ok(samples.filter((x) => x > samples[0] + 2 && x < samples.at(-1) - 2).length > 2, 'release continues smoothly');
+	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.evaluate(() => window.harness.getSlider().slideTo(0, 'instant'));
 	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 0);
 	const sliderTouch = await context.newCDPSession(page);
@@ -84,22 +109,22 @@ try {
 	await page.evaluate(() => window.harness.getSlider().slideTo(0, 'instant'));
 	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 0);
 	assert.notEqual(
-		await page.locator('.slider-navigation').evaluate((node) => getComputedStyle(node).display),
+		await page.locator('.azure-net-ui-slider-navigation').evaluate((node) => getComputedStyle(node).display),
 		'flex',
 		'decorations absent without CSS import'
 	);
 	await page.evaluate(() => import('/tests/browser/styles.js'));
-	await page.waitForFunction(() => getComputedStyle(document.querySelector('.slider-navigation')).display === 'flex');
-	await page.evaluate(() => document.querySelector('.slider').classList.remove('styled'));
+	await page.waitForFunction(() => getComputedStyle(document.querySelector('.azure-net-ui-slider-navigation')).display === 'flex');
+	await page.evaluate(() => document.querySelector('.azure-net-ui-slider').classList.remove('styled'));
 	assert.notEqual(
-		await page.locator('.slider-navigation').evaluate((node) => getComputedStyle(node).display),
+		await page.locator('.azure-net-ui-slider-navigation').evaluate((node) => getComputedStyle(node).display),
 		'flex',
 		'decorations require styled opt-in'
 	);
-	await page.evaluate(() => document.querySelector('.slider').classList.add('styled'));
+	await page.evaluate(() => document.querySelector('.azure-net-ui-slider').classList.add('styled'));
 	await page.getByRole('button', { name: 'Next', exact: true }).click();
 	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 1);
-	await page.locator('.slider-viewport').focus();
+	await page.locator('.azure-net-ui-slider-viewport').focus();
 	await page.keyboard.press('End');
 	await page.waitForFunction(() => {
 		const api = window.harness.getSlider();
@@ -116,7 +141,7 @@ try {
 		window.harness.getSlider().slideTo(1, 'instant');
 	});
 	await page.waitForFunction(() => {
-		const node = document.querySelector('.slider-viewport');
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
 		return (
 			Math.abs(node.scrollLeft - (node.children[1].offsetLeft - node.children[0].offsetLeft)) < 1 && window.harness.getSlider().activeIndex === 1
 		);
@@ -127,7 +152,7 @@ try {
 		window.harness.getSlider().slideTo(0, 'instant');
 	});
 	await page.emulateMedia({ reducedMotion: 'no-preference' });
-	await page.waitForFunction(() => document.querySelector('.slider-viewport').scrollLeft === 0);
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 0);
 	await page.evaluate(() => {
 		const api = window.harness.getSlider();
 		api.slideNext();
@@ -137,7 +162,7 @@ try {
 		window.dispatchEvent(new Event('resize'));
 	});
 	await page.waitForFunction(() => {
-		const node = document.querySelector('.slider-viewport');
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
 		return (
 			Math.abs(node.scrollLeft - (node.children[2].offsetLeft - node.children[0].offsetLeft)) < 1 && window.harness.getSlider().activeIndex === 2
 		);
@@ -149,35 +174,37 @@ try {
 		api.slideNext();
 	});
 	await page.waitForFunction(() => {
-		const node = document.querySelector('.slider-viewport');
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
 		return (
 			Math.abs(node.scrollLeft - (node.children[1].offsetLeft - node.children[0].offsetLeft)) < 1 && window.harness.getSlider().activeIndex === 1
 		);
 	});
 	await page.evaluate(() => window.harness.getSlider().slideTo(0, 'instant'));
-	await page.waitForFunction(() => document.querySelector('.slider-viewport').scrollLeft === 0);
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 0);
 	await page.getByRole('button', { name: 'Next', exact: true }).click();
 	await page.getByRole('button', { name: 'Previous', exact: true }).click();
-	await page.waitForFunction(() => document.querySelector('.slider-viewport').scrollLeft === 0);
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 0);
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.evaluate(() => {
 		window.harness.setItems(['a', 'a']);
 		window.harness.setPerView(1);
 	});
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 2);
-	assert.equal(await page.locator('.slider-slide').count(), 2, 'duplicate primitive slides render');
+	assert.equal(await page.locator('.azure-net-ui-slider-slide').count(), 2, 'duplicate primitive slides render');
 	await page.evaluate(() => {
 		window.harness.setItems(['wide']);
 		window.harness.setPerView(0.5);
 	});
-	await page.waitForFunction(() => window.harness.getSlider().pageCount === 2 && document.querySelectorAll('.slider-slide').length === 1);
+	await page.waitForFunction(
+		() => window.harness.getSlider().pageCount === 2 && document.querySelectorAll('.azure-net-ui-slider-slide').length === 1
+	);
 	await page.getByRole('button', { name: 'Next', exact: true }).click();
 	await page.waitForFunction(() => {
-		const node = document.querySelector('.slider-viewport');
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
 		return node.scrollLeft > 0 && Math.abs(node.scrollLeft - (node.scrollWidth - node.clientWidth)) < 1;
 	});
 	await page.getByRole('button', { name: 'Previous', exact: true }).click();
-	await page.waitForFunction(() => document.querySelector('.slider-viewport').scrollLeft === 0);
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 0);
 	await page.evaluate(() => window.harness.setItems(['one', 'two', 'three', 'four', 'five']));
 	await page.evaluate(() => window.harness.setPerView(2));
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 4);

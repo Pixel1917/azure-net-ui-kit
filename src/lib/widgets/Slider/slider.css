@@ -1,11 +1,11 @@
 /* Optional decoration. Structural scroll-snap layout stays in Slider.svelte. */
-.slider.styled > .slider-navigation,
-.slider.styled > .slider-pagination {
+.azure-net-ui-slider.styled > .azure-net-ui-slider-navigation,
+.azure-net-ui-slider.styled > .azure-net-ui-slider-pagination {
 	display: flex;
 	gap: 0.5rem;
 	margin-top: 0.75rem;
 }
-.slider.styled > :is(.slider-navigation, .slider-pagination) > button {
+.azure-net-ui-slider.styled > :is(.azure-net-ui-slider-navigation, .azure-net-ui-slider-pagination) > button {
 	font: inherit;
 	padding: 0.4em 0.75em;
 	border: 1px solid currentColor;
@@ -14,11 +14,11 @@
 	background: transparent;
 	cursor: pointer;
 }
-.slider.styled > :is(.slider-navigation, .slider-pagination) > button:disabled {
+.azure-net-ui-slider.styled > :is(.azure-net-ui-slider-navigation, .azure-net-ui-slider-pagination) > button:disabled {
 	opacity: 0.4;
 	cursor: default;
 }
-.slider.styled > .slider-pagination > button[aria-current] {
+.azure-net-ui-slider.styled > .azure-net-ui-slider-pagination > button[aria-current] {
 	font-weight: bold;
 	text-decoration: underline;
 }

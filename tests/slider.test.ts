@@ -43,7 +43,7 @@ describe('Slider', () => {
 			}
 		});
 		flushSync();
-		const viewport = document.querySelector('.slider-viewport') as HTMLElement;
+		const viewport = document.querySelector('.azure-net-ui-slider-viewport') as HTMLElement;
 		viewport.scrollTo = vi.fn((options?: ScrollToOptions | number) => {
 			viewport.scrollLeft = typeof options === 'number' ? options : (options?.left ?? 0);
 			viewport.dispatchEvent(new Event('scroll'));
@@ -78,7 +78,7 @@ it('allows duplicate primitives and repeated object references without getKey', 
 		const slide = createRawSnippet<[unknown, number]>(() => ({ render: () => '<span>Slide</span>' }));
 		const instance = mount(Slider, { target: document.body, props: { items, slide } });
 		flushSync();
-		expect(document.querySelectorAll('.slider-slide')).toHaveLength(2);
+		expect(document.querySelectorAll('.azure-net-ui-slider-slide')).toHaveLength(2);
 		await unmount(instance);
 	}
 });
@@ -87,14 +87,14 @@ it('uses positional reuse by default and preserves explicit keyed identity on re
 	for (const keyed of [false, true]) {
 		const instance = mount(Harness, { target: document.body, props: { keyed } });
 		flushSync();
-		const first = document.querySelector('.slider-slide');
+		const first = document.querySelector('.azure-net-ui-slider-slide');
 		instance.update(['B', 'A', 'D', 'C']);
 		flushSync();
-		expect(document.querySelectorAll('.slider-slide')[keyed ? 1 : 0]).toBe(first);
+		expect(document.querySelectorAll('.azure-net-ui-slider-slide')[keyed ? 1 : 0]).toBe(first);
 		if (!keyed) {
 			instance.update(['a', 'a']);
 			flushSync();
-			expect(document.querySelectorAll('.slider-slide')).toHaveLength(2);
+			expect(document.querySelectorAll('.azure-net-ui-slider-slide')).toHaveLength(2);
 		}
 		await unmount(instance);
 	}
@@ -118,7 +118,7 @@ it('keeps rapid smooth targets through intermediate scrollend and redundant meas
 		}
 	});
 	flushSync();
-	const viewport = document.querySelector('.slider-viewport') as HTMLElement;
+	const viewport = document.querySelector('.azure-net-ui-slider-viewport') as HTMLElement;
 	const scrollTo = vi.fn();
 	viewport.scrollTo = scrollTo;
 	api.slideNext();
@@ -159,7 +159,7 @@ it('includes a terminal position when one slide is wider than the viewport', asy
 		}
 	});
 	flushSync();
-	const viewport = document.querySelector('.slider-viewport') as HTMLElement;
+	const viewport = document.querySelector('.azure-net-ui-slider-viewport') as HTMLElement;
 	const scrollTo = vi.fn();
 	viewport.scrollTo = scrollTo;
 	expect(api.pageCount).toBe(2);

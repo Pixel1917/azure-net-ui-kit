@@ -120,18 +120,18 @@
 </script>
 
 {#snippet slideItem(item: T, index: number)}
-	<div class="slider-slide" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${items.length}`}>
+	<div class="azure-net-ui-slider-slide" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${items.length}`}>
 		{@render slide(item, index)}
 	</div>
 {/snippet}
 
 <!-- Dynamic element content is text, unlike a literal style tag's raw-text body. -->
 <svelte:head><svelte:element this={'style'}>{css}</svelte:element></svelte:head>
-<section data-slider={id} class={['slider', className, { styled }]} aria-label={label} aria-roledescription="carousel">
+<section data-slider={id} class={['azure-net-ui-slider', className, { styled }]} aria-label={label} aria-roledescription="carousel">
 	<!-- A scrollable viewport needs keyboard focus; descendants keep their own keyboard behavior. -->
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 	<div
-		class="slider-viewport"
+		class="azure-net-ui-slider-viewport"
 		id={`${id}-viewport`}
 		role="group"
 		aria-label={label}
@@ -154,14 +154,14 @@
 	</div>
 	{#if navigation}{@render navigation(api)}
 	{:else if showNavigation}
-		<div class="slider-navigation">
+		<div class="azure-net-ui-slider-navigation">
 			<button type="button" aria-controls={`${id}-viewport`} disabled={api.isBeginning} onclick={api.slidePrev}>Previous</button>
 			<button type="button" aria-controls={`${id}-viewport`} disabled={api.isEnd} onclick={api.slideNext}>Next</button>
 		</div>
 	{/if}
 	{#if pagination}{@render pagination(api)}
 	{:else if showPagination}
-		<div class="slider-pagination" aria-label="Choose slide">
+		<div class="azure-net-ui-slider-pagination" aria-label="Choose slide">
 			{#each Array.from({ length: pageCount }, (_, index) => index) as page (page)}
 				<button
 					type="button"
@@ -175,10 +175,10 @@
 </section>
 
 <style>
-	.slider {
+	.azure-net-ui-slider {
 		min-width: 0;
 	}
-	.slider-viewport {
+	.azure-net-ui-slider-viewport {
 		position: relative;
 		display: flex;
 		gap: var(--slider-gap);
@@ -188,12 +188,12 @@
 		scroll-snap-type: x mandatory;
 		direction: ltr;
 	}
-	.slider-viewport::-webkit-scrollbar {
+	.azure-net-ui-slider-viewport::-webkit-scrollbar {
 		display: none;
 		width: 0;
 		height: 0;
 	}
-	.slider-slide {
+	.azure-net-ui-slider-slide {
 		flex: 0 0 calc((100% - (var(--slider-view) - 1) * var(--slider-gap)) / var(--slider-view));
 		min-width: 0;
 		scroll-snap-align: start;

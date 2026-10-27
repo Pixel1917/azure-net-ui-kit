@@ -28,6 +28,11 @@ it('drags mouse, snaps, suppresses drag clicks and leaves touch and inputs nativ
 		expect(node.style.scrollSnapType).toBe('none');
 		pointer(window, 'pointerup', 80);
 		expect(settle).toHaveBeenCalledWith(1);
+		expect(node.style.scrollSnapType).toBe('none');
+		node.dispatchEvent(new Event('scrollend'));
+		expect(node.style.scrollSnapType).toBe('none');
+		node.scrollLeft = 200;
+		node.dispatchEvent(new Event('scrollend'));
 		expect(node.style.scrollSnapType).toBe('');
 		expect(link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))).toBe(false);
 		pointer(link, 'pointerdown', 80);

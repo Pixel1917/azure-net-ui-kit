@@ -1,6 +1,6 @@
 {
 	"name": "@azure-net/ui-kit",
-	"version": "0.4.2",
+	"version": "0.4.3",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
