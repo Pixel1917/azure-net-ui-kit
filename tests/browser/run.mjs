@@ -61,6 +61,28 @@ try {
 	await page.goto(url);
 	await page.waitForSelector('html[data-hydrated="true"]');
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 3);
+	assert.equal(await page.locator('.slider-viewport').evaluate((node) => getComputedStyle(node).scrollbarWidth), 'none');
+	const dragRect = await page.locator('.slider-viewport').boundingBox();
+	await page.mouse.move(dragRect.x + 500, dragRect.y + 70);
+	await page.mouse.down();
+	await page.mouse.move(dragRect.x + 200, dragRect.y + 70, { steps: 12 });
+	await page.mouse.up();
+	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 1);
+	await page.evaluate(() => window.harness.getSlider().slideTo(0, 'instant'));
+	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 0);
+	const sliderTouch = await context.newCDPSession(page);
+	await sliderTouch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: dragRect.x + 500, y: dragRect.y + 70, id: 1 }] });
+	for (let step = 1; step <= 10; step++) {
+		await sliderTouch.send('Input.dispatchTouchEvent', {
+			type: 'touchMove',
+			touchPoints: [{ x: dragRect.x + 500 - step * 30, y: dragRect.y + 70, id: 1 }]
+		});
+	}
+	await sliderTouch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+	await page.waitForFunction(() => window.harness.getSlider().activeIndex > 0);
+	await sliderTouch.detach();
+	await page.evaluate(() => window.harness.getSlider().slideTo(0, 'instant'));
+	await page.waitForFunction(() => window.harness.getSlider().activeIndex === 0);
 	assert.notEqual(
 		await page.locator('.slider-navigation').evaluate((node) => getComputedStyle(node).display),
 		'flex',

@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { SliderApi, SliderProps } from './types.js';
 	import { sliderCss } from './utils.js';
+	import { attachMouseDrag } from './mouseDrag.js';
 
 	let {
 		items,
@@ -95,7 +96,9 @@
 			onReady?.(api);
 		});
 		const frame = view.requestAnimationFrame(measure);
+		const cleanupDrag = attachMouseDrag(node, () => positions, slideTo);
 		return () => {
+			cleanupDrag();
 			view.cancelAnimationFrame(frame);
 			resize?.disconnect();
 			mutation.disconnect();
@@ -180,8 +183,15 @@
 		display: flex;
 		gap: var(--slider-gap);
 		overflow-x: auto;
+		scrollbar-width: none;
+		cursor: grab;
 		scroll-snap-type: x mandatory;
 		direction: ltr;
+	}
+	.slider-viewport::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
 	}
 	.slider-slide {
 		flex: 0 0 calc((100% - (var(--slider-view) - 1) * var(--slider-gap)) / var(--slider-view));

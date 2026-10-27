@@ -202,7 +202,10 @@ controls. Snippets receive the same stable API object as `onReady`:
 - `onReady(api)` runs after attachment (and again after layout-prop changes).
   `onChange(index)` follows actual scrolling, not just button requests.
   Geometry-dependent pagination starts empty during SSR and is measured on mount.
-- Native touch/trackpad scrolling works without JavaScript. A focused viewport
+- The scrollbar is always hidden by structural CSS. Mouse dragging works after
+  hydration and snaps on release. Links remain clickable, but a drag suppresses the
+  subsequent click; inputs and buttons keep their normal behavior. Native
+  touch/trackpad scrolling works without JavaScript. A focused viewport
   supports Left/Right/Home/End without intercepting keys in slide inputs.
   Reduced-motion preferences disable smooth programmatic scrolling.
 - Only structural layout ships in the component. Import `@azure-net/ui-kit/slider.css`
@@ -211,7 +214,7 @@ controls. Snippets receive the same stable API object as `onReady`:
   `navigation`/`pagination` snippets take precedence. Use `className` and the
   `.slider-*` classes for customization. Custom snippets own their styles.
 - Scope: horizontal LTR, equal-width slides. No loop, autoplay, virtual slides,
-  mouse-drag emulation, vertical/RTL mode, or Swiper dependency. Browser-native
+  vertical/RTL mode, or Swiper dependency. Browser-native
   scroll timing is used. The generated inline stylesheet must be permitted by
   your CSP (for example, an appropriate style hash policy).
 
