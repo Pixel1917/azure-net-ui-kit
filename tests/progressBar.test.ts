@@ -87,3 +87,41 @@ describe('progressBar', () => {
 		vi.useRealTimers();
 	});
 });
+
+it.each(['start', 'set', 'remove'] as const)('cancels pending completion on %s', async (method) => {
+	vi.useFakeTimers();
+	const { progressBar } = await importProgressBar();
+	try {
+		progressBar.configure({ speed: 100, trickle: false }).start().done();
+		expect(vi.getTimerCount()).toBe(1);
+		if (method === 'set') progressBar.set(0.5);
+		else progressBar[method]();
+		expect(vi.getTimerCount()).toBe(0);
+		if (method === 'remove') progressBar.start();
+		await vi.advanceTimersByTimeAsync(200);
+		expect(progressBar.isStarted()).toBe(true);
+		expect(document.getElementById('azure-net-progress-bar')).not.toBeNull();
+	} finally {
+		progressBar.remove();
+		vi.useRealTimers();
+	}
+});
+
+it('replaces repeated completion timers instead of removing the bar early', async () => {
+	vi.useFakeTimers();
+	const { progressBar } = await importProgressBar();
+	try {
+		progressBar.configure({ speed: 100, trickle: false }).start().done();
+		await vi.advanceTimersByTimeAsync(50);
+		progressBar.done(true);
+		expect(vi.getTimerCount()).toBe(1);
+		await vi.advanceTimersByTimeAsync(50);
+		expect(document.getElementById('azure-net-progress-bar')).not.toBeNull();
+		await vi.advanceTimersByTimeAsync(50);
+		expect(document.getElementById('azure-net-progress-bar')).toBeNull();
+		expect(vi.getTimerCount()).toBe(0);
+	} finally {
+		progressBar.remove();
+		vi.useRealTimers();
+	}
+});

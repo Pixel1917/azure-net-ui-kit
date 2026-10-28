@@ -8,9 +8,10 @@
 	let store = $state<NotificationsStore>();
 
 	onMount(() => {
-		store = new NotificationsStore();
-		setStore(store);
-		return () => destroyStore();
+		const owner = new NotificationsStore();
+		store = owner;
+		setStore(owner);
+		return () => destroyStore(owner);
 	});
 
 	const {

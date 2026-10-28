@@ -42,6 +42,12 @@ const getRandomIncrement = (status: number) => {
 const createProgressBar = (): ProgressBarManager => {
 	let status: number | null = null;
 	let trickleTimer: ReturnType<typeof setTimeout> | undefined;
+	let doneTimer: ReturnType<typeof setTimeout> | undefined;
+
+	const clearDone = () => {
+		clearTimeout(doneTimer);
+		doneTimer = undefined;
+	};
 
 	const options: Required<Omit<ProgressBarOptions, 'parent'>> & Pick<ProgressBarOptions, 'parent'> = {
 		minimum: 0.08,
@@ -179,13 +185,14 @@ const createProgressBar = (): ProgressBarManager => {
 
 		set(progress) {
 			assertBrowser();
+			clearDone();
 
 			status = progress >= 1 ? null : clamp(progress, options.minimum, 0.994);
 			updateBar(status ?? 1, progress >= 1 ? '0' : '1');
 
 			if (progress >= 1) {
 				clearTrickle();
-				setTimeout(() => api.remove(), options.speed);
+				doneTimer = setTimeout(() => api.remove(), options.speed);
 			}
 
 			return api;
@@ -211,6 +218,7 @@ const createProgressBar = (): ProgressBarManager => {
 
 		remove() {
 			assertBrowser();
+			clearDone();
 			clearTrickle();
 			status = null;
 			getElement()?.remove();

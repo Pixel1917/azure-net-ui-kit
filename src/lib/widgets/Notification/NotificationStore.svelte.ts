@@ -12,6 +12,7 @@ export interface INotificationStore {
 	create(config: NotificationConfig): Notification;
 	destroy(id?: string | 'last' | 'first'): Promise<void>;
 	destroyAll(): Promise<void>;
+	clearTimers?(): void;
 }
 
 export interface INotificationManager {
@@ -43,11 +44,29 @@ const createNotification = (id: string, config: NotificationConfig): Notificatio
 
 export class NotificationsStore implements INotificationStore {
 	notifications = $state<Notification[]>([]);
+	private timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+	private clearTimer(id: string) {
+		clearTimeout(this.timers.get(id));
+		this.timers.delete(id);
+	}
+
+	clearTimers() {
+		for (const timer of this.timers.values()) clearTimeout(timer);
+		this.timers.clear();
+	}
 
 	create(config: NotificationConfig) {
 		const id = config.id ?? generateName();
 		const notification = createNotification(id, config);
 		this.notifications = [...this.notifications, notification];
+		this.clearTimer(id);
+		if (notification.duration && notification.duration > 0 && BROWSER) {
+			this.timers.set(
+				id,
+				setTimeout(() => this.destroy(id), notification.duration)
+			);
+		}
 		return notification;
 	}
 
@@ -70,25 +89,30 @@ export class NotificationsStore implements INotificationStore {
 		}
 
 		if (notification) {
+			this.clearTimer(notification.id);
 			this.notifications = this.notifications.filter((n) => n.id !== notification.id);
 			await notification.onClose?.();
 		}
 	}
 
 	async destroyAll() {
-		const closesList = this.notifications.map((n) => n.onClose?.());
+		const notifications = this.notifications;
 		this.notifications = [];
-		await Promise.all(closesList);
+		this.clearTimers();
+		await Promise.all(notifications.map(async (n) => n.onClose?.()));
 	}
 }
 
 const createNotificationManager = () => {
 	let store: INotificationStore | undefined;
 	const setStore = (notificationStore: INotificationStore) => {
+		if (store !== notificationStore) store?.clearTimers?.();
 		store = notificationStore;
 	};
 
-	const destroyStore = () => {
+	const destroyStore = (notificationStore = store) => {
+		notificationStore?.clearTimers?.();
+		if (notificationStore !== store) return;
 		store = undefined;
 	};
 
@@ -96,23 +120,12 @@ const createNotificationManager = () => {
 		if (!store) {
 			throw Error('Do not call show on server side or before mount');
 		}
-		const notification = store.create(config);
-		let timeout: ReturnType<typeof setTimeout> | undefined;
-
-		if (notification.duration && notification.duration > 0 && BROWSER) {
-			timeout = setTimeout(async () => {
-				await store?.destroy(notification.id);
-			}, notification.duration);
-		}
+		const owner = store;
+		const notification = owner.create(config);
 
 		return {
 			notification,
-			destroy: () => {
-				if (timeout) {
-					clearTimeout(timeout);
-				}
-				destroy(notification.id);
-			}
+			destroy: () => owner.destroy(notification.id)
 		};
 	};
 

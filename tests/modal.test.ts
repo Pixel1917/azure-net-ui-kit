@@ -273,3 +273,23 @@ describe('lazy modal loader', () => {
 		destroyStore();
 	});
 });
+
+it('destroyAll clears modals before callbacks and attempts every callback after synchronous throws', async () => {
+	const { ModalsStore } = await importModalStore();
+	const store = new ModalsStore();
+	const error = new Error('close failed');
+	const first = vi.fn(() => {
+		expect(store.modals).toEqual([]);
+		throw error;
+	});
+	const second = vi.fn(() => {
+		throw new Error('second failed');
+	});
+	const third = vi.fn(async () => {});
+	for (const onClose of [first, second, third]) store.create({ component, options: { onClose } });
+	await expect(store.destroyAll()).rejects.toBe(error);
+	for (const callback of [first, second, third]) expect(callback).toHaveBeenCalledTimes(1);
+	expect(store.modals).toEqual([]);
+	await store.destroyAll();
+	expect(first).toHaveBeenCalledTimes(1);
+});

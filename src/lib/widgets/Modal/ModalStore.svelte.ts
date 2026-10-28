@@ -196,9 +196,9 @@ export class ModalsStore implements IModalStore {
 	}
 
 	async destroyAll() {
-		const closesList = this.modals.map((m) => m.options.onClose?.());
+		const modals = this.modals;
 		this.modals = [];
-		await Promise.all(closesList);
+		await Promise.all(modals.map(async (m) => m.options.onClose?.()));
 	}
 }
 
