@@ -1,7 +1,7 @@
 import type { Snippet } from 'svelte';
 
 export interface SliderLayout {
-	slidesPerView?: number;
+	slidesPerView?: number | 'auto';
 	spaceBetween?: number;
 }
 export interface SliderApi {

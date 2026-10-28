@@ -188,6 +188,9 @@ controls. Snippets receive the same stable API object as `onReady`:
 - `items` and `slide` are required. Without `getKey`, slides use positional reuse
   (index semantics), so duplicate primitives and repeated object references work.
   Provide `getKey` with unique identifiers to preserve item identity during reorder.
+- `slidesPerView: 'auto'` uses CSS/intrinsic slide widths. Different widths are
+  supported; ResizeObserver tracks size changes after image/font loading.
+  Numeric/auto modes can be mixed in breakpoints.
 - Layout defaults: `slidesPerView: 1`, `spaceBetween: 0` (pixels). Fractional
   positive slide counts are supported. Invalid counts/gaps fall back to 1/0.
 - Breakpoints are viewport-width CSS media queries, sorted numerically. Each
@@ -215,10 +218,29 @@ controls. Snippets receive the same stable API object as `onReady`:
   `.azure-net-ui-slider-*` classes for customization. The root class is
   `azure-net-ui-slider`; the old generic `slider` classes are no longer emitted.
   Custom snippets own their styles.
-- Scope: horizontal LTR, equal-width slides. No loop, autoplay, virtual slides,
+- Scope: horizontal LTR, equal-width numeric mode or variable-width auto mode. No loop, autoplay, virtual slides,
   vertical/RTL mode, or Swiper dependency. Browser-native
   scroll timing is used. The generated inline stylesheet must be permitted by
   your CSP (for example, an appropriate style hash policy).
+
+### Auto-width example
+
+```svelte
+<Slider items={photos} slidesPerView="auto" spaceBetween={16}>
+	{#snippet slide(photo)}
+		<article style="width: 280px">
+			<img src={photo.src} alt={photo.alt} style="display:block;width:100%" />
+		</article>
+	{/snippet}
+</Slider>
+```
+
+Widths apply in SSR too. Set a width on the snippet content or on
+`.azure-net-ui-slider-slide`. Percentage-only child widths need a definite parent
+width; prefer px, rem, or clamp() with viewport units for auto-width cards.
+Use `breakpoints={{ 768: { slidesPerView: 3 }, 1200: { slidesPerView: 'auto' } }}`
+to switch modes. For numeric mode, ensure fixed-width content fits its slide
+(for example, add `max-width: 100%` to the card).
 
 ## Zoomable Attachment (Svelte 5.29+)
 

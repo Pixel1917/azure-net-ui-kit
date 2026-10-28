@@ -88,8 +88,28 @@
 		const view = node.ownerDocument.defaultView!;
 		const resize = typeof view.ResizeObserver === 'function' ? new view.ResizeObserver(measure) : undefined;
 		resize?.observe(node);
-		const mutation = new view.MutationObserver(measure);
-		mutation.observe(node, { childList: true, subtree: true });
+		const observed = new Set<Element>();
+		function observeSlides() {
+			for (const child of observed) {
+				if (child.parentElement !== node) {
+					resize?.unobserve(child);
+					observed.delete(child);
+				}
+			}
+			for (const child of node.children) {
+				if (!observed.has(child)) {
+					resize?.observe(child);
+					observed.add(child);
+				}
+			}
+		}
+		observeSlides();
+		const mutation = new view.MutationObserver(() => {
+			observeSlides();
+			measure();
+		});
+		mutation.observe(node, { childList: true, subtree: true, characterData: true });
+		node.addEventListener('load', measure, true);
 		view.addEventListener('resize', measure);
 		untrack(() => {
 			measure();
@@ -101,7 +121,9 @@
 			cleanupDrag();
 			view.cancelAnimationFrame(frame);
 			resize?.disconnect();
+			observed.clear();
 			mutation.disconnect();
+			node.removeEventListener('load', measure, true);
 			view.removeEventListener('resize', measure);
 			viewport = undefined;
 			positions = [];
@@ -194,7 +216,7 @@
 		height: 0;
 	}
 	.azure-net-ui-slider-slide {
-		flex: 0 0 calc((100% - (var(--slider-view) - 1) * var(--slider-gap)) / var(--slider-view));
+		flex: 0 0 var(--slider-basis);
 		min-width: 0;
 		scroll-snap-align: start;
 	}

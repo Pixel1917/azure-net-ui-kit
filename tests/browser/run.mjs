@@ -131,8 +131,19 @@ try {
 		return api.isEnd && api.activeIndex === api.pageCount - 1;
 	});
 	await page.getByLabel('Input three').focus();
+	// Focusing an input may itself scroll it into view; Home must not move the slider further.
+	const inputPosition = await page.evaluate(
+		() =>
+			new Promise((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.azure-net-ui-slider-viewport').scrollLeft)))
+			)
+	);
 	await page.keyboard.press('Home');
-	assert.equal(await page.evaluate(() => window.harness.getSlider().activeIndex), 2, 'input keys do not navigate slider');
+	assert.equal(
+		await page.locator('.azure-net-ui-slider-viewport').evaluate((node) => node.scrollLeft),
+		inputPosition,
+		'input keys do not navigate slider'
+	);
 	await page.setViewportSize({ width: 390, height: 1000 });
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 5);
 	await page.evaluate(() => {
@@ -212,6 +223,36 @@ try {
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 1);
 	await page.evaluate(() => window.harness.setItems([]));
 	await page.waitForFunction(() => window.harness.getSlider().pageCount === 0);
+	await page.evaluate(() => {
+		window.harness.setItems(['one', 'two', 'three']);
+		window.harness.setPerView('auto');
+	});
+	await page.waitForFunction(() => document.querySelectorAll('.azure-net-ui-slider-slide').length === 3);
+	await page.evaluate(() =>
+		document.querySelectorAll('.azure-net-ui-slider-slide article').forEach((node, index) => {
+			node.style.width = `${[120, 260, 180][index]}px`;
+		})
+	);
+	await page.waitForFunction(() => {
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
+		return (
+			[...node.children].map((child) => child.getBoundingClientRect().width).join(',') === '120,260,180' && window.harness.getSlider().pageCount === 3
+		);
+	});
+	await page.evaluate(() => window.harness.getSlider().slideTo(1, 'instant'));
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 132);
+	await page.evaluate(() => {
+		document.querySelector('.azure-net-ui-slider-slide article').style.width = '200px';
+	});
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-slide').getBoundingClientRect().width === 200);
+	await page.waitForTimeout(100);
+	await page.evaluate(() => window.harness.getSlider().slideTo(1, 'instant'));
+	await page.waitForFunction(() => document.querySelector('.azure-net-ui-slider-viewport').scrollLeft === 212);
+	await page.evaluate(() => window.harness.setPerView(1));
+	await page.waitForFunction(() => {
+		const node = document.querySelector('.azure-net-ui-slider-viewport');
+		return Math.abs(node.firstElementChild.getBoundingClientRect().width - node.clientWidth) < 1;
+	});
 
 	const alignmentResults = await page.evaluate(async () => {
 		const { createZoomable } = await import('/src/lib/utils/zoomable/index.ts');

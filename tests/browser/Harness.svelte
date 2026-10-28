@@ -11,7 +11,7 @@
 	let enabled = $state(true);
 	let mounted = $state(true);
 	let items = $state(['one', 'two', 'three', 'four', 'five']);
-	let perView = $state(1);
+	let perView = $state<number | 'auto'>(1);
 	let cropSrc = $state<string | Blob>(
 		'data:image/svg+xml,' +
 			encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200"><rect width="600" height="200" fill="green"/></svg>')
@@ -29,7 +29,7 @@
 	export function setItems(next: string[]) {
 		items = next;
 	}
-	export function setPerView(next: number) {
+	export function setPerView(next: number | 'auto') {
 		perView = next;
 	}
 	export function setSource(src: string | Blob) {

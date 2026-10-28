@@ -13,6 +13,18 @@ describe('real server compilation', () => {
 		});
 		try {
 			const { render } = await server.ssrLoadModule('svelte/server');
+			const { createRawSnippet } = await server.ssrLoadModule('svelte');
+			const { default: Slider } = await server.ssrLoadModule('/src/lib/widgets/Slider/Slider.svelte');
+			const auto = render(Slider, {
+				props: {
+					items: [120, 260],
+					slidesPerView: 'auto',
+					slide: createRawSnippet((width: () => number) => ({ render: () => `<article style="width:${width()}px">Slide</article>` }))
+				}
+			});
+			expect(auto.head).toContain('--slider-basis:auto');
+			expect(auto.body).toContain('width:120px');
+			expect(auto.body).toContain('width:260px');
 			const { default: SliderHarness } = await server.ssrLoadModule('/tests/fixtures/SliderHarness.svelte');
 			const result = render(SliderHarness);
 			expect(result.body).toContain('>A<');

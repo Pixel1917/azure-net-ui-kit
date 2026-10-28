@@ -2,7 +2,12 @@ import type { SliderLayout } from './types.js';
 
 export function normalizeLayout(layout: SliderLayout) {
 	return {
-		slidesPerView: Number.isFinite(layout.slidesPerView) && layout.slidesPerView! > 0 ? layout.slidesPerView! : 1,
+		slidesPerView:
+			layout.slidesPerView === 'auto'
+				? ('auto' as const)
+				: Number.isFinite(layout.slidesPerView) && layout.slidesPerView! > 0
+					? layout.slidesPerView!
+					: 1,
 		spaceBetween: Number.isFinite(layout.spaceBetween) && layout.spaceBetween! >= 0 ? layout.spaceBetween! : 0
 	};
 }
@@ -12,7 +17,8 @@ export function sliderCss(id: string, base: SliderLayout, breakpoints: Record<nu
 	const selector = `[data-slider="${id.replace(/[^a-zA-Z0-9_-]/g, '_')}"]`;
 	const rule = (layout: SliderLayout) => {
 		const { slidesPerView, spaceBetween } = normalizeLayout(layout);
-		return `${selector}{--slider-view:${slidesPerView};--slider-gap:${spaceBetween}px;}`;
+		const basis = slidesPerView === 'auto' ? 'auto' : 'calc((100% - (var(--slider-view) - 1) * var(--slider-gap)) / var(--slider-view))';
+		return `${selector}{--slider-view:${slidesPerView};--slider-gap:${spaceBetween}px;--slider-basis:${basis};}`;
 	};
 	return (
 		rule(base) +

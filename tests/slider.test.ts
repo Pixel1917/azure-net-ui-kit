@@ -11,6 +11,12 @@ afterEach(() => {
 });
 
 describe('Slider', () => {
+	it('supports intrinsic width and switches basis in numeric/auto breakpoints', () => {
+		const css = sliderCss('auto', { slidesPerView: 'auto', spaceBetween: 16 }, { 800: { slidesPerView: 3 }, 1200: { slidesPerView: 'auto' } });
+		expect(css).toContain('--slider-view:auto;--slider-gap:16px;--slider-basis:auto;');
+		expect(css).toContain('--slider-view:3;--slider-gap:16px;--slider-basis:calc(');
+		expect(css.match(/--slider-basis:auto;/g)).toHaveLength(2);
+	});
 	it('sorts breakpoints, normalizes numeric input and rejects CSS injection', () => {
 		const css = sliderCss(
 			'safe',
